@@ -318,4 +318,34 @@ export const useAppStore = create((set, get) => ({
 
     return totalAssetsAED - totalLoansAED;
   }
+  ,
+  metalRates: { gold_aed: 620, silver_aed: 12, gold_inr: 16200, silver_inr: 300 },
+
+  fetchMetalRates: async () => {
+    const rates = await api.getLiveMetalRates();
+    if (rates) set({ metalRates: rates });
+  },
+
+  getGlobalNetWorth: () => {
+    const { wealth, loans, fxRate, metalRates } = get();
+    
+    const assetsAED = wealth.reduce((acc, asset) => {
+      if (asset.category === 'commodity') {
+        const isGold = asset.name.toLowerCase().includes('gold');
+        const rate = asset.currency === 'AED' 
+          ? (isGold ? metalRates.gold_aed : metalRates.silver_aed)
+          : (isGold ? metalRates.gold_inr : metalRates.silver_inr) / fxRate;
+        return acc + (asset.grams * rate);
+      }
+      const val = asset.currency === 'INR' ? asset.value / fxRate : asset.value;
+      return acc + val;
+    }, 0);
+
+    const debtsAED = loans.reduce((acc, loan) => {
+      const val = loan.currency === 'INR' ? loan.principal / fxRate : loan.principal;
+      return acc + val;
+    }, 0);
+
+    return assetsAED - debtsAED;
+  },
 }));  

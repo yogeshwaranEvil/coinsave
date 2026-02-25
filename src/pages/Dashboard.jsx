@@ -3,7 +3,7 @@ import { useEffect, useMemo } from 'react';
 import { 
   ArrowDownRight, ArrowUpRight, Send, Zap, 
   Landmark, Plus, Minus, CalendarClock, CheckCircle2,
-  TrendingDown, TrendingUp
+  TrendingDown, TrendingUp, Coins
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
@@ -24,7 +24,9 @@ export default function Dashboard() {
     markUpcomingAsPaid,
     getGlobalNetWorth,
     fetchLoans,
-    fetchAssets
+    fetchAssets,
+    metalRates,       // New
+    fetchMetalRates    // New
   } = useAppStore();
 
   useEffect(() => {
@@ -33,7 +35,8 @@ export default function Dashboard() {
     fetchUpcoming();
     fetchLoans();
     fetchAssets();
-  }, [fetchLiveFxRate, fetchTransactions, fetchUpcoming, fetchLoans, fetchAssets]);
+    fetchMetalRates(); // Sync gold/silver on mount
+  }, [fetchLiveFxRate, fetchTransactions, fetchUpcoming, fetchLoans, fetchAssets, fetchMetalRates]);
 
   // Calculations for Monthly Cash Flow
   const { monthlyIncome, monthlyExpense, netSavings, savingsRate } = useMemo(() => {
@@ -61,7 +64,7 @@ export default function Dashboard() {
     return { monthlyIncome: incomeAED, monthlyExpense: expenseAED, netSavings: net, savingsRate: rate };
   }, [transactions, fxRate]);
 
-  // Use Global Intelligence for the main header
+  // Global Intelligence
   const totalNetWorth = getGlobalNetWorth();
   const isNegativeWorth = totalNetWorth < 0;
 
@@ -94,14 +97,57 @@ export default function Dashboard() {
       {/* QUICK FX WIDGET */}
       <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-4 flex justify-between items-center text-[10px] font-bold tracking-[0.1em]">
         <span className="text-neutral-500 uppercase">Live Pulse</span>
-        <span className="text-emerald-500 font-mono">1 AED = ₹{fxRate ? fxRate.toFixed(2) : '...'}</span>
+        <span className="text-emerald-500 font-mono text-xs">1 AED = ₹{fxRate ? fxRate.toFixed(2) : '...'}</span>
+      </div>
+
+      {/* METAL RATES WIDGET */}
+      <div className="bg-neutral-900/60 border border-neutral-800 rounded-[32px] p-6 space-y-5 shadow-xl">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-amber-500/10 rounded-xl text-amber-500"><Coins size={18} /></div>
+            <h2 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Commodity Pulse</h2>
+          </div>
+          <button 
+            onClick={fetchMetalRates}
+            className="text-[10px] font-black text-indigo-400 uppercase tracking-widest active:scale-90 transition-all"
+          >
+            Refresh
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* Dubai (AED) */}
+          <div className="space-y-3 bg-neutral-950/40 p-4 rounded-2xl border border-neutral-800/40">
+            <p className="text-[9px] font-black text-neutral-600 uppercase tracking-tighter">🇦🇪 Dubai (AED/g)</p>
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-neutral-400">Gold 24K</span>
+              <span className="text-xs font-black text-white">{metalRates.gold_aed.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-neutral-400">Silver</span>
+              <span className="text-xs font-black text-white">{metalRates.silver_aed.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* India (INR) */}
+          <div className="space-y-3 bg-neutral-950/40 p-4 rounded-2xl border border-neutral-800/40">
+            <p className="text-[9px] font-black text-neutral-600 uppercase tracking-tighter">🇮🇳 India (INR/g)</p>
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-neutral-400">Gold 24K</span>
+              <span className="text-xs font-black text-white">₹{metalRates.gold_inr.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-neutral-400">Silver</span>
+              <span className="text-xs font-black text-white">₹{metalRates.silver_inr.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* MONTHLY STATUS CARD */}
       <div className={`relative overflow-hidden rounded-[32px] p-6 transition-all duration-700 border ${
         netSavings < 0 ? 'bg-rose-500/10 border-rose-500/20' : 'bg-emerald-500/10 border-emerald-500/20'
       }`}>
-        {/* Glow Background */}
         <div className={`absolute -top-24 -right-24 w-48 h-48 blur-[80px] rounded-full opacity-40 ${
           netSavings < 0 ? 'bg-rose-500' : 'bg-emerald-500'
         }`}></div>
@@ -111,7 +157,7 @@ export default function Dashboard() {
             <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${
               netSavings < 0 ? 'text-rose-400' : 'text-emerald-400'
             }`}>
-              {netSavings < 0 ? 'Monthly Shortfall' : 'Net Savings'}
+              {netSavings < 0 ? 'Monthly shortfall' : 'Net Savings'}
             </p>
             <h2 className="text-3xl font-black text-white">
               {formatMoney(netSavings, isAED, fxRate, 'AED')}
@@ -130,8 +176,8 @@ export default function Dashboard() {
           }`}>
             Efficiency: {savingsRate}%
           </div>
-          <p className="text-[10px] font-bold text-neutral-500 uppercase">
-            {netSavings < 0 ? 'Spend Alert' : 'Positive Momentum'}
+          <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-tight">
+            {netSavings < 0 ? 'Spending exceeds income' : 'Positive Momentum'}
           </p>
         </div>
       </div>
@@ -180,8 +226,8 @@ export default function Dashboard() {
       {upcomingBills.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em]">Scheduled</h2>
-            <button onClick={() => navigate('/upcoming-bills')} className="text-indigo-400 text-[10px] font-bold uppercase tracking-widest">Manage</button>
+            <h2 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em]">Upcoming</h2>
+            <button onClick={() => navigate('/upcoming-bills')} className="text-indigo-400 text-[10px] font-bold uppercase tracking-widest">View All</button>
           </div>
           
           <div className="flex gap-4 overflow-x-auto pb-4 snap-x [&::-webkit-scrollbar]:hidden">

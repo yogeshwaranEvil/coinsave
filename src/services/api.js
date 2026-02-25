@@ -1,5 +1,5 @@
 // src/services/api.js
-
+const GOLD_API_KEY = 'goldapi-317fkx19mm2f2o0t-io';
 const STORAGE_KEYS = {
   TRANSACTIONS: 'coinsave_transactions',
   WEALTH: 'coinsave_wealth',
@@ -233,5 +233,29 @@ export const api = {
     const filtered = assets.filter(a => a.id !== id && a._id !== id);
     saveData(STORAGE_KEYS.WEALTH, filtered);
     return true;
+  },
+
+  getLiveMetalRates: async () => {
+    const headers = { "x-access-token": GOLD_API_KEY, "Content-Type": "application/json" };
+    try {
+      // Fetch Gold & Silver for both AED and INR
+      const [gAED, sAED, gINR, sINR] = await Promise.all([
+        fetch('https://www.goldapi.io/api/XAU/AED', { headers }).then(r => r.json()),
+        fetch('https://www.goldapi.io/api/XAG/AED', { headers }).then(r => r.json()),
+        fetch('https://www.goldapi.io/api/XAU/INR', { headers }).then(r => r.json()),
+        fetch('https://www.goldapi.io/api/XAG/INR', { headers }).then(r => r.json()),
+      ]);
+
+      return {
+        gold_aed: gAED.price_gram_24k || 620, // Fallbacks if API limits reached
+        silver_aed: sAED.price_gram || 12,
+        gold_inr: gINR.price_gram_24k || 16200,
+        silver_inr: sINR.price_gram || 300,
+        lastUpdated: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error("Metal API Error:", error);
+      return null;
+    }
   }
 };
