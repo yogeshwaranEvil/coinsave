@@ -1,21 +1,29 @@
 // src/components/layout/BottomNav.jsx
-import { Home, ListOrdered, Send, Wallet } from 'lucide-react';
+import { Home, ListOrdered, Send, Landmark, Coins, Settings } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 export default function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Hide BottomNav on detail screens and forms to give them full focus
+  const hideOnRoutes = ['/add-expense', '/add-income', '/add-remittance'];
+  if (hideOnRoutes.includes(location.pathname) || location.pathname.includes('/transaction/') || location.pathname.includes('/loan/')) {
+    return null; 
+  }
+
   const navItems = [
     { name: 'Home', path: '/', icon: Home },
     { name: 'History', path: '/transactions', icon: ListOrdered },
     { name: 'Remit', path: '/remittance', icon: Send },
-    { name: 'Wealth', path: '/wealth', icon: Wallet },
+    { name: 'Loans', path: '/loans', icon: Landmark },
+    { name: 'Assets', path: '/assets', icon: Coins },
+    { name: 'Settings', path: '/settings', icon: Settings },
   ];
 
   return (
-    <div className="fixed bottom-0 w-full sm:max-w-md bg-neutral-900/90 backdrop-blur-md border-t border-neutral-800 pb-safe z-50">
-      <div className="flex justify-around items-center h-16 px-2">
+    <div className="fixed bottom-0 w-full sm:max-w-md bg-neutral-950/90 backdrop-blur-md border-t border-neutral-800 pb-safe z-50">
+      <div className="grid grid-cols-6 items-center h-16 px-1">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
@@ -28,7 +36,7 @@ export default function BottomNav() {
               }`}
             >
               <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-              <span className="text-[10px] font-medium">{item.name}</span>
+              <span className="text-[9px] font-medium tracking-wide">{item.name}</span>
             </button>
           );
         })}

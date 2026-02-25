@@ -1,101 +1,99 @@
 // src/pages/Remittance.jsx
 import { useEffect, useState } from 'react';
-import { Send, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Send, ArrowRight, TrendingUp, Plus } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function Remittance() {
+  const navigate = useNavigate();
   const [remittances, setRemittances] = useState([]);
-  
-  // Form State
-  const [aedSent, setAedSent] = useState('');
-  const [fee, setFee] = useState('15'); // Standard bank fee default
-  const [fxRate, setFxRate] = useState('');
-  const [destination, setDestination] = useState('HDFC Savings');
 
-  const loadData = () => api.getRemittances().then(setRemittances).catch(console.error);
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    api.getRemittances().then(setRemittances).catch(console.error);
+  }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!aedSent || !fxRate) return;
+  // Calculate Yearly Summary Metrics
+  const summary = remittances.reduce((acc, remit) => {
+    acc.totalAedSent += remit.aed_sent;
+    acc.totalInrReceived += remit.inr_received;
+    acc.totalFees += remit.transfer_fee_aed;
+    return acc;
+  }, { totalAedSent: 0, totalInrReceived: 0, totalFees: 0 });
 
-    const inrReceived = parseFloat(aedSent) * parseFloat(fxRate);
-
-    try {
-      await api.createRemittance({
-        aed_sent: parseFloat(aedSent),
-        transfer_fee_aed: parseFloat(fee),
-        exchange_rate_secured: parseFloat(fxRate),
-        inr_received: inrReceived,
-        destination_account: destination
-      });
-      setAedSent(''); setFxRate('');
-      loadData();
-    } catch (err) {
-      alert("Error saving remittance");
-    }
-  };
+  const avgFxRate = summary.totalAedSent > 0 
+    ? (summary.totalInrReceived / summary.totalAedSent).toFixed(2) 
+    : 0;
 
   return (
-    <div className="p-5 space-y-6">
-      <h1 className="text-xl font-bold flex items-center gap-2">
-        <Send className="text-indigo-400" /> Send to India
-      </h1>
-
-      {/* Remittance Form */}
-      <form onSubmit={handleSubmit} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-[10px] text-neutral-500 uppercase tracking-wide">AED Sent</label>
-            <input type="number" placeholder="0.00" value={aedSent} onChange={(e) => setAedSent(e.target.value)} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white outline-none mt-1" />
-          </div>
-          <div>
-            <label className="text-[10px] text-neutral-500 uppercase tracking-wide">Locked FX Rate</label>
-            <input type="number" step="0.001" placeholder="22.85" value={fxRate} onChange={(e) => setFxRate(e.target.value)} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white outline-none mt-1" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-[10px] text-neutral-500 uppercase tracking-wide">Transfer Fee (AED)</label>
-            <input type="number" value={fee} onChange={(e) => setFee(e.target.value)} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white outline-none mt-1" />
-          </div>
-          <div>
-            <label className="text-[10px] text-neutral-500 uppercase tracking-wide">Destination Bank</label>
-            <input type="text" value={destination} onChange={(e) => setDestination(e.target.value)} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white outline-none mt-1" />
-          </div>
-        </div>
-
-        {/* Auto-calculated preview */}
-        {aedSent && fxRate && (
-          <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 flex justify-between items-center text-sm">
-            <span className="text-indigo-300">You will receive:</span>
-            <span className="font-bold text-indigo-400">₹ {(aedSent * fxRate).toLocaleString()}</span>
-          </div>
-        )}
-
-        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl transition-colors">
-          Record Transfer
+    <div className="p-5 space-y-6 animate-in fade-in duration-300 pb-24">
+      {/* HEADER */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-xl font-bold text-white flex items-center gap-2">
+          <Send className="text-indigo-400" /> Remittance Log
+        </h1>
+        <button 
+          onClick={() => navigate('/add-remittance')}
+          className="bg-indigo-600 p-2 rounded-full text-white hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-500/30"
+        >
+          <Plus size={20} />
         </button>
-      </form>
+      </div>
 
-      {/* History List */}
-      <div className="space-y-3 pb-6">
-        <h2 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Transfer History</h2>
-        {remittances.map((remit) => (
-          <div key={remit._id} className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex flex-col gap-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold text-neutral-300">{remit.destination_account}</span>
-              <span className="text-[10px] text-neutral-500">{new Date(remit.date).toLocaleDateString()}</span>
+      {/* YEARLY SUMMARY DASHBOARD */}
+      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 space-y-4">
+        <div className="flex justify-between items-end">
+          <div>
+            <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1">Total Sent This Year</div>
+            <div className="text-2xl font-bold text-indigo-400">
+              {summary.totalAedSent.toLocaleString()} <span className="text-sm font-normal text-indigo-400/70">AED</span>
             </div>
-            <div className="flex items-center justify-between text-lg font-bold">
-              <span className="text-rose-400">-{remit.aed_sent} <span className="text-xs font-normal">AED</span></span>
-              <ArrowRight size={16} className="text-neutral-600" />
-              <span className="text-emerald-400">+{remit.inr_received.toLocaleString()} <span className="text-xs font-normal">INR</span></span>
-            </div>
-            <div className="text-[10px] text-neutral-500 text-right">Rate applied: {remit.exchange_rate_secured}</div>
           </div>
-        ))}
+          <div className="text-right">
+            <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1">Net INR Received</div>
+            <div className="text-xl font-bold text-emerald-400">
+              ₹ {summary.totalInrReceived.toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        <div className="h-px w-full bg-neutral-800"></div>
+
+        <div className="flex justify-between items-center text-xs">
+          <div className="flex flex-col">
+            <span className="text-neutral-500">Average FX Rate</span>
+            <span className="font-bold text-white flex items-center gap-1 mt-0.5">
+              <TrendingUp size={12} className="text-yellow-500" /> {avgFxRate}
+            </span>
+          </div>
+          <div className="flex flex-col text-right">
+            <span className="text-neutral-500">Total Fees Paid</span>
+            <span className="font-bold text-rose-400 mt-0.5">{summary.totalFees} AED</span>
+          </div>
+        </div>
+      </div>
+
+      {/* REMITTANCE HISTORY */}
+      <div className="space-y-3">
+        <h2 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Transfer History</h2>
+        
+        {remittances.length === 0 ? (
+          <div className="text-center text-neutral-500 py-10 text-sm">No transfers recorded yet.</div>
+        ) : (
+          remittances.map((remit) => (
+            <div key={remit._id} className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex flex-col gap-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-semibold text-neutral-200">{remit.destination_account}</span>
+                <span className="text-[10px] text-neutral-500">{new Date(remit.date).toLocaleDateString()}</span>
+              </div>
+              <div className="flex items-center justify-between text-lg font-bold">
+                <span className="text-rose-400">-{remit.aed_sent.toLocaleString()} <span className="text-xs font-normal">AED</span></span>
+                <ArrowRight size={16} className="text-neutral-600" />
+                <span className="text-emerald-400">+{remit.inr_received.toLocaleString()} <span className="text-xs font-normal">INR</span></span>
+              </div>
+              <div className="text-[10px] text-neutral-500 text-right">Rate applied: {remit.exchange_rate_secured}</div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

@@ -1,99 +1,103 @@
 // src/pages/Transactions.jsx
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { api } from '../services/api';
 import { formatMoney } from '../utils/helpers';
-import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Search, Filter } from 'lucide-react';
 
 export default function Transactions() {
+  const navigate = useNavigate();
   const { isAED, fxRate } = useAppStore();
   const [transactions, setTransactions] = useState([]);
   
-  // Form State
-  const [amount, setAmount] = useState('');
-  const [type, setType] = useState('expense');
-  const [currency, setCurrency] = useState('AED');
-  const [category, setCategory] = useState('');
+  // Filter States
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('All'); // All, Income, Expense
+  const [filterCurrency, setFilterCurrency] = useState('All'); // All, AED, INR
 
-  const loadData = () => {
+  useEffect(() => {
     api.getTransactions().then(setTransactions).catch(console.error);
-  };
+  }, []);
 
-  useEffect(() => { loadData(); }, []);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!amount || !category) return;
-
-    try {
-      await api.createTransaction({
-        type,
-        amount: parseFloat(amount),
-        currency,
-        category,
-      });
-      // Reset form and reload list
-      setAmount(''); setCategory('');
-      loadData();
-    } catch (err) {
-      alert("Error saving transaction");
-    }
-  };
+  // Apply Search and Filters
+  const filteredTransactions = transactions.filter(tx => {
+    const matchesSearch = tx.category.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (tx.notes && tx.notes.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesType = filterType === 'All' || tx.type.toLowerCase() === filterType.toLowerCase();
+    const matchesCurrency = filterCurrency === 'All' || tx.currency === filterCurrency;
+    
+    return matchesSearch && matchesType && matchesCurrency;
+  });
 
   return (
-    <div className="p-5 space-y-6">
-      <h1 className="text-xl font-bold">Log & History</h1>
+    <div className="p-5 space-y-6 animate-in fade-in duration-300 pb-24">
+      <h1 className="text-xl font-bold text-white flex items-center justify-between">
+        Transaction History
+        <Filter size={20} className="text-neutral-400" />
+      </h1>
 
-      {/* Add Transaction Form */}
-      <form onSubmit={handleSubmit} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 space-y-4">
-        <div className="grid grid-cols-2 gap-2">
-          <select value={type} onChange={(e) => setType(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-sm rounded-lg p-2 text-white outline-none">
-            <option value="expense">Expense</option>
-            <option value="income">Income</option>
-          </select>
-          <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-sm rounded-lg p-2 text-white outline-none">
-            <option value="AED">AED</option>
-            <option value="INR">INR</option>
-          </select>
-        </div>
-        
-        <input 
-          type="number" 
-          placeholder="Amount" 
-          value={amount} 
-          onChange={(e) => setAmount(e.target.value)}
-          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white outline-none"
-        />
+      {/* SEARCH BAR */}
+      <div className="relative">
+        <Search className="absolute left-3 top-3.5 text-neutral-500" size={18} />
         <input 
           type="text" 
-          placeholder="Category (e.g. Food, Salary)" 
-          value={category} 
-          onChange={(e) => setCategory(e.target.value)}
-          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white outline-none"
+          placeholder="Search categories or notes..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full bg-neutral-900 border border-neutral-800 rounded-xl py-3 pl-10 pr-4 text-white outline-none placeholder:text-neutral-600 focus:border-neutral-600 transition-colors"
         />
-        <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-colors">
-          Save Record
-        </button>
-      </form>
+      </div>
 
-      {/* History List */}
-      <div className="space-y-3">
-        {transactions.map((tx) => (
-          <div key={tx._id} className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex justify-between items-center">
-            <div className="flex items-center space-x-3">
-              <div className={`p-2 rounded-full ${tx.type === 'income' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                {tx.type === 'income' ? <ArrowDownRight size={16} /> : <ArrowUpRight size={16} />}
-              </div>
-              <div>
-                <p className="text-sm font-semibold">{tx.category}</p>
-                <p className="text-[10px] text-neutral-500">{new Date(tx.date).toLocaleDateString()}</p>
-              </div>
-            </div>
-            <div className={`font-bold ${tx.type === 'income' ? 'text-emerald-400' : 'text-neutral-100'}`}>
-              {tx.type === 'expense' ? '-' : '+'}{formatMoney(tx.amount, isAED, fxRate, tx.currency)}
-            </div>
-          </div>
+      {/* QUICK FILTERS */}
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        {['All', 'Income', 'Expense'].map(type => (
+          <button 
+            key={type}
+            onClick={() => setFilterType(type)}
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${filterType === type ? 'bg-white text-black' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}
+          >
+            {type}
+          </button>
         ))}
+        <div className="w-px bg-neutral-800 mx-1"></div>
+        {['All', 'AED', 'INR'].map(cur => (
+          <button 
+            key={cur}
+            onClick={() => setFilterCurrency(cur)}
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${filterCurrency === cur ? 'bg-indigo-500 text-white' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}
+          >
+            {cur}
+          </button>
+        ))}
+      </div>
+
+      {/* TRANSACTION LIST */}
+      <div className="space-y-3">
+        {filteredTransactions.length === 0 ? (
+          <div className="text-center text-neutral-500 py-10 text-sm">No transactions found.</div>
+        ) : (
+          filteredTransactions.map((tx) => (
+            <div 
+              key={tx._id} 
+              onClick={() => navigate(`/transaction/${tx._id}`)}
+              className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex justify-between items-center active:scale-[0.98] transition-transform cursor-pointer"
+            >
+              <div className="flex items-center space-x-3">
+                <div className={`p-2 rounded-full ${tx.type === 'income' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                  {tx.type === 'income' ? <ArrowDownRight size={16} /> : <ArrowUpRight size={16} />}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-neutral-200">{tx.category}</p>
+                  <p className="text-[10px] text-neutral-500">{new Date(tx.date).toLocaleDateString()} • {tx.currency}</p>
+                </div>
+              </div>
+              <div className={`font-bold ${tx.type === 'income' ? 'text-emerald-400' : 'text-neutral-100'}`}>
+                {tx.type === 'expense' ? '-' : '+'}{formatMoney(tx.amount, isAED, fxRate, tx.currency)}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

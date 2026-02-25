@@ -1,22 +1,52 @@
 // src/App.jsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import BottomNav from './components/layout/BottomNav';
+
+// Pages (We will create these one by one)
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
-import BottomNav from './components/layout/BottomNav';
+import TransactionDetail from './pages/TransactionDetail';
+import AddExpense from './pages/AddExpense';
+import AddIncome from './pages/AddIncome';
 import Remittance from './pages/Remittance';
-import Wealth from './pages/Wealth';
+import AddRemittance from './pages/AddRemittance';
+import Loans from './pages/Loans';
+import LoanDetail from './pages/LoanDetail';
+import Assets from './pages/Assets';
+import Settings from './pages/Settings';
 
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans sm:max-w-md sm:mx-auto sm:border-x sm:border-neutral-800 relative pb-24 shadow-2xl overflow-x-hidden">
+      {/* Using neutral-950 for the deep dark mode. 
+        pb-20 ensures content isn't hidden behind the 6-item bottom nav.
+      */}
+      <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans sm:max-w-md sm:mx-auto sm:border-x sm:border-neutral-800 relative pb-20 shadow-2xl overflow-x-hidden">
         <Routes>
+          {/* 🏠 Main Flow */}
           <Route path="/" element={<Dashboard />} />
+          <Route path="/add-expense" element={<AddExpense />} />
+          <Route path="/add-income" element={<AddIncome />} />
+          
+          {/* 📊 Transactions */}
           <Route path="/transactions" element={<Transactions />} />
-          {/* Placeholders for next step */}
+          <Route path="/transaction/:id" element={<TransactionDetail />} />
+          
+          {/* 🌍 Cross-Border */}
           <Route path="/remittance" element={<Remittance />} />
-          <Route path="/wealth" element={< Wealth />} />
+          <Route path="/add-remittance" element={<AddRemittance />} />
+          
+          {/* 🏦 Loans (Phase 2 UI) */}
+          <Route path="/loans" element={<Loans />} />
+          <Route path="/loan/:id" element={<LoanDetail />} />
+          
+          {/* 🪙 Assets (Phase 2 UI) */}
+          <Route path="/assets" element={<Assets />} />
+          
+          {/* ⚙️ Settings */}
+          <Route path="/settings" element={<Settings />} />
         </Routes>
+        
         <BottomNav />
       </div>
     </Router>
