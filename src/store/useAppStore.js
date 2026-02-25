@@ -278,5 +278,44 @@ export const useAppStore = create((set, get) => ({
       totalOwed: Number(loan.principal) + accruedInterest,
       dailyCost: Number(loan.principal) * dailyRate
     };
+  },
+
+  wealth: [], // This will hold our Assets
+
+  // --- ASSET ACTIONS ---
+  fetchAssets: async () => {
+    const data = await api.getAssets();
+    set({ wealth: data });
+  },
+
+  addAsset: async (assetData) => {
+    const newAsset = await api.createAsset(assetData);
+    set((state) => ({ wealth: [...state.wealth, newAsset] }));
+  },
+
+  updateAsset: async (id, data) => {
+    const updated = await api.updateAsset(id, data);
+    set((state) => ({
+      wealth: state.wealth.map(a => (a.id === id || a._id === id) ? updated : a)
+    }));
+  },
+
+  // --- GLOBAL INTELLIGENCE ---
+  getGlobalNetWorth: () => {
+    const { wealth, loans, fxRate } = get();
+    
+    // Total Assets in AED
+    const totalAssetsAED = wealth.reduce((acc, asset) => {
+      const val = asset.currency === 'INR' ? asset.value / fxRate : asset.value;
+      return acc + val;
+    }, 0);
+
+    // Total Loans in AED
+    const totalLoansAED = loans.reduce((acc, loan) => {
+      const val = loan.currency === 'INR' ? loan.principal / fxRate : loan.principal;
+      return acc + val;
+    }, 0);
+
+    return totalAssetsAED - totalLoansAED;
   }
 }));  

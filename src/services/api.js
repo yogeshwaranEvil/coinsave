@@ -202,5 +202,37 @@ export const api = {
     const filtered = remittances.filter(r => r.id !== id && r._id !== id);
     saveData(STORAGE_KEYS.REMITTANCES, filtered);
     return true;
+  },
+  // --- ASSETS / WEALTH ---
+  getAssets: async () => {
+    await simulateNetwork();
+    return getData(STORAGE_KEYS.WEALTH);
+  },
+
+  createAsset: async (data) => {
+    await simulateNetwork();
+    const assets = getData(STORAGE_KEYS.WEALTH);
+    const newItem = { ...data, id: generateId(), createdAt: new Date().toISOString() };
+    assets.push(newItem);
+    saveData(STORAGE_KEYS.WEALTH, assets);
+    return newItem;
+  },
+
+  updateAsset: async (id, data) => {
+    await simulateNetwork();
+    const assets = getData(STORAGE_KEYS.WEALTH);
+    const index = assets.findIndex(a => a.id === id || a._id === id);
+    if (index === -1) throw new Error('Asset not found');
+    assets[index] = { ...assets[index], ...data, updatedAt: new Date().toISOString() };
+    saveData(STORAGE_KEYS.WEALTH, assets);
+    return assets[index];
+  },
+
+  deleteAsset: async (id) => {
+    await simulateNetwork();
+    const assets = getData(STORAGE_KEYS.WEALTH);
+    const filtered = assets.filter(a => a.id !== id && a._id !== id);
+    saveData(STORAGE_KEYS.WEALTH, filtered);
+    return true;
   }
 };
