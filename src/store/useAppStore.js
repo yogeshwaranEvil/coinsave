@@ -25,6 +25,7 @@ export const useAppStore = create((set, get) => ({
   remittances: [],
   wealth: [],
   upcomingBills: [],
+  loans: [],
   isLoading: false,
 
   // --- TRANSACTION ACTIONS ---
@@ -129,16 +130,12 @@ export const useAppStore = create((set, get) => ({
 
   updateRemittance: async (id, updatedData) => {
     const { transactions, updateTransaction, addTransaction } = get();
-    
-    // 1. Update the actual Remittance record
     const updatedRemit = await api.updateRemittance(id, updatedData);
     
-    // 2. Update Remittances State
     set((state) => ({
       remittances: state.remittances.map(r => (r.id === id || r._id === id) ? updatedRemit : r)
     }));
 
-    // 3. SYNC WITH HISTORY
     const twinId = `remit-${id}`;
     const twinExists = transactions.some(tx => tx.id === twinId || tx._id === twinId);
 
@@ -180,4 +177,79 @@ export const useAppStore = create((set, get) => ({
       remittances: state.remittances.filter(r => r.id !== id && r._id !== id)
     }));
   },
-}));
+
+  // --- LOAN ACTIONS ---
+  fetchLoans: async () => {
+    const data = await api.getLoans();
+    const sorted = data.sort((a, b) => new Date(a.closeDate) - new Date(b.closeDate));
+    set({ loans: sorted });
+  },
+
+  addLoan: async (loanData) => {
+    const newLoan = await api.createLoan(loanData);
+    set((state) => ({
+      loans: [...state.loans, newLoan].sort((a, b) => new Date(a.closeDate) - new Date(b.closeDate))
+    }));
+    return newLoan;
+  },
+
+  updateLoan: async (id, updatedData) => {
+    const updated = await api.updateLoan(id, updatedData);
+    set((state) => ({
+      loans: state.loans.map(l => (l.id === id || l._id === id) ? updated : l)
+        .sort((a, b) => new Date(a.closeDate) - new Date(b.closeDate))
+    }));
+  },
+
+  deleteLoan: async (id) => {
+    await api.deleteLoan(id);
+    set((state) => ({
+      loans: state.loans.filter(l => l.id !== id && l._id !== id)
+    }));
+  },
+
+  payLoan: async (loanId, paymentAmount, note = '') => {
+    const { loans, updateLoan, addTransaction } = get();
+    const loan = loans.find(l => l.id === loanId || l._id === loanId);
+
+    if (!loan) return;
+
+    const newPrincipal = Math.max(0, loan.principal - paymentAmount);
+
+    await addTransaction({
+      type: 'expense',
+      amount: paymentAmount,
+      currency: loan.currency,
+      category: 'Loan Repayment',
+      date: new Date().toISOString(),
+      notes: `${note || `Repayment for ${loan.name}`}`
+    });
+
+    await updateLoan(loanId, { 
+      principal: newPrincipal,
+      status: newPrincipal === 0 ? 'closed' : 'active'
+    });
+  },
+
+  // --- DYNAMIC INTEREST CALCULATION ---
+  getLiveLoanBalance: (loan) => {
+    const now = new Date();
+    // Use the date the loan was added or updated to track interest accrual
+    const startDate = new Date(loan.updatedAt || loan.createdAt || loan.date);
+    
+    // Total days elapsed since last update/creation
+    const diffTime = Math.abs(now - startDate);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    // (Monthly Int / 30) = Daily Rate
+    const dailyRate = (Number(loan.interestPerMonth) / 100) / 30;
+    const accruedInterest = Number(loan.principal) * dailyRate * diffDays;
+    
+    return {
+      currentPrincipal: Number(loan.principal),
+      accruedInterest: accruedInterest,
+      totalOwed: Number(loan.principal) + accruedInterest,
+      dailyCost: Number(loan.principal) * dailyRate
+    };
+  }
+}));  

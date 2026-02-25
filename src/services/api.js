@@ -78,12 +78,13 @@
 
 // src/services/api.js
 // src/services/api.js
-
+// src/services/api.js
 const STORAGE_KEYS = {
   TRANSACTIONS: 'coinsave_transactions',
   WEALTH: 'coinsave_wealth',
   REMITTANCES: 'coinsave_remittances',
   UPCOMING: 'coinsave_upcoming',
+  LOANS: 'coinsave_loans', // NEW
 };
 
 const getData = (key) => {
@@ -113,12 +114,7 @@ export const api = {
   createTransaction: async (data) => {
     await simulateNetwork();
     const transactions = getData(STORAGE_KEYS.TRANSACTIONS);
-    // FIX: Respect provided ID (important for remit twins)
-    const newItem = { 
-      ...data, 
-      id: data.id || generateId(), 
-      createdAt: new Date().toISOString() 
-    };
+    const newItem = { ...data, id: data.id || generateId(), createdAt: new Date().toISOString() };
     transactions.push(newItem);
     saveData(STORAGE_KEYS.TRANSACTIONS, transactions);
     return newItem;
@@ -128,15 +124,8 @@ export const api = {
     await simulateNetwork();
     const transactions = getData(STORAGE_KEYS.TRANSACTIONS);
     const index = transactions.findIndex(t => t.id === id || t._id === id);
-    
-    if (index === -1) return null; // Store handles "Add if missing"
-    
-    transactions[index] = { 
-      ...transactions[index], 
-      ...data, 
-      updatedAt: new Date().toISOString() 
-    };
-    
+    if (index === -1) return null;
+    transactions[index] = { ...transactions[index], ...data, updatedAt: new Date().toISOString() };
     saveData(STORAGE_KEYS.TRANSACTIONS, transactions);
     return transactions[index];
   },
@@ -149,36 +138,36 @@ export const api = {
     return true;
   },
 
-  // --- UPCOMING ---
-  getUpcoming: async () => {
+  // --- LOANS ---
+  getLoans: async () => {
     await simulateNetwork();
-    return getData(STORAGE_KEYS.UPCOMING);
+    return getData(STORAGE_KEYS.LOANS);
   },
 
-  createUpcoming: async (data) => {
+  createLoan: async (data) => {
     await simulateNetwork();
-    const upcoming = getData(STORAGE_KEYS.UPCOMING);
+    const loans = getData(STORAGE_KEYS.LOANS);
     const newItem = { ...data, id: generateId(), createdAt: new Date().toISOString() };
-    upcoming.push(newItem);
-    saveData(STORAGE_KEYS.UPCOMING, upcoming);
+    loans.push(newItem);
+    saveData(STORAGE_KEYS.LOANS, loans);
     return newItem;
   },
 
-  updateUpcoming: async (id, data) => {
+  updateLoan: async (id, data) => {
     await simulateNetwork();
-    const upcoming = getData(STORAGE_KEYS.UPCOMING);
-    const index = upcoming.findIndex(u => u.id === id || u._id === id);
-    if (index === -1) throw new Error('Upcoming bill not found');
-    upcoming[index] = { ...upcoming[index], ...data, updatedAt: new Date().toISOString() };
-    saveData(STORAGE_KEYS.UPCOMING, upcoming);
-    return upcoming[index];
+    const loans = getData(STORAGE_KEYS.LOANS);
+    const index = loans.findIndex(l => l.id === id || l._id === id);
+    if (index === -1) throw new Error('Loan not found');
+    loans[index] = { ...loans[index], ...data, updatedAt: new Date().toISOString() };
+    saveData(STORAGE_KEYS.LOANS, loans);
+    return loans[index];
   },
 
-  deleteUpcoming: async (id) => {
+  deleteLoan: async (id) => {
     await simulateNetwork();
-    const upcoming = getData(STORAGE_KEYS.UPCOMING);
-    const filtered = upcoming.filter(u => u.id !== id && u._id !== id);
-    saveData(STORAGE_KEYS.UPCOMING, filtered);
+    const loans = getData(STORAGE_KEYS.LOANS);
+    const filtered = loans.filter(l => l.id !== id && l._id !== id);
+    saveData(STORAGE_KEYS.LOANS, filtered);
     return true;
   },
 
@@ -202,13 +191,7 @@ export const api = {
     const remittances = getData(STORAGE_KEYS.REMITTANCES);
     const index = remittances.findIndex(r => r.id === id || r._id === id);
     if (index === -1) throw new Error('Remittance record not found');
-    
-    remittances[index] = { 
-      ...remittances[index], 
-      ...data, 
-      updatedAt: new Date().toISOString() 
-    };
-    
+    remittances[index] = { ...remittances[index], ...data, updatedAt: new Date().toISOString() };
     saveData(STORAGE_KEYS.REMITTANCES, remittances);
     return remittances[index];
   },
