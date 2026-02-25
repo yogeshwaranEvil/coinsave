@@ -26,6 +26,11 @@ export default function RemittanceDetail() {
       navigate('/remittance');
     }
   };
+  const handleEdit = () => {
+  // Use remit.id or remit._id to ensure we get the right one from your list
+  const targetId = remit.id || remit._id; 
+  navigate(`/edit-remittance/${targetId}`); 
+};
 
   return (
     <div className="min-h-screen bg-neutral-950 p-5 animate-in slide-in-from-right-4 pb-24">
@@ -95,7 +100,7 @@ export default function RemittanceDetail() {
       {/* ACTION BUTTONS */}
       <div className="flex gap-3 mt-8">
         <button 
-          onClick={() => navigate(`/add-remittance?edit=${remit.id || remit._id}`)}
+    onClick={handleEdit}
           className="flex-1 bg-neutral-900 border border-neutral-800 py-4 rounded-2xl text-white font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md"
         >
           <Edit3 size={18} /> Edit

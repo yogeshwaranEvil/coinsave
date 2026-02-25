@@ -45,6 +45,7 @@ export const useAppStore = create((set, get) => ({
 
   updateTransaction: async (id, updatedData) => {
     const updatedTx = await api.updateTransaction(id, updatedData);
+    if (!updatedTx) return null;
     set((state) => ({
       transactions: state.transactions.map(tx => (tx.id === id || tx._id === id) ? updatedTx : tx)
     }));
@@ -112,15 +113,14 @@ export const useAppStore = create((set, get) => ({
     const { addTransaction } = get();
     const newRemit = await api.createRemittance(remitData);
     
-    // Automatically log this as an expense to impact Net Worth
     await addTransaction({
-      id: `remit-${newRemit.id}`, // Custom ID to link them
+      id: `remit-${newRemit.id}`, 
       type: 'expense',
       amount: newRemit.aed_sent + newRemit.transfer_fee_aed,
       currency: 'AED',
       category: 'Remittance',
       date: newRemit.date,
-      notes: `To: ${newRemit.destination_account} (Rate: ${newRemit.exchange_rate_secured})`
+      notes: `Sent to ${newRemit.destination_account}`
     });
 
     set((state) => ({ remittances: [newRemit, ...state.remittances] }));
@@ -128,31 +128,56 @@ export const useAppStore = create((set, get) => ({
   },
 
   updateRemittance: async (id, updatedData) => {
-    const { updateTransaction } = get();
+    const { transactions, updateTransaction, addTransaction } = get();
+    
+    // 1. Update the actual Remittance record
     const updatedRemit = await api.updateRemittance(id, updatedData);
     
-    // Update the linked transaction entry
-    await updateTransaction(`remit-${id}`, {
-      amount: updatedRemit.aed_sent + updatedRemit.transfer_fee_aed,
-      date: updatedRemit.date,
-      notes: `To: ${updatedRemit.destination_account} (Rate: ${updatedRemit.exchange_rate_secured})`
-    });
-
+    // 2. Update Remittances State
     set((state) => ({
       remittances: state.remittances.map(r => (r.id === id || r._id === id) ? updatedRemit : r)
     }));
+
+    // 3. SYNC WITH HISTORY
+    const twinId = `remit-${id}`;
+    const twinExists = transactions.some(tx => tx.id === twinId || tx._id === twinId);
+
+    const twinPayload = {
+      amount: updatedRemit.aed_sent + updatedRemit.transfer_fee_aed,
+      date: updatedRemit.date,
+      notes: `Sent to ${updatedRemit.destination_account}`,
+      category: 'Remittance',
+      type: 'expense',
+      currency: 'AED'
+    };
+
+    if (twinExists) {
+      const updatedTwin = await api.updateTransaction(twinId, twinPayload);
+      set((state) => ({
+        transactions: state.transactions.map(tx => 
+          (tx.id === twinId || tx._id === twinId) ? updatedTwin : tx
+        )
+      }));
+    } else {
+      const newTwin = await api.createTransaction({
+        ...twinPayload,
+        id: twinId 
+      });
+      set((state) => ({
+        transactions: [newTwin, ...state.transactions]
+      }));
+    }
+
     return updatedRemit;
   },
 
   deleteRemittance: async (id) => {
     const { deleteTransaction } = get();
     await api.deleteRemittance(id);
-    
-    // Remove the linked transaction to restore Net Worth
     await deleteTransaction(`remit-${id}`);
     
     set((state) => ({
       remittances: state.remittances.filter(r => r.id !== id && r._id !== id)
     }));
-  }
+  },
 }));

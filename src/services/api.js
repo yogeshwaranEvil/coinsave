@@ -76,46 +76,35 @@
 // };  
 
 
-
-
+// src/services/api.js
 // src/services/api.js
 
-// Define the keys we will use to save data in the browser's localStorage
 const STORAGE_KEYS = {
   TRANSACTIONS: 'coinsave_transactions',
   WEALTH: 'coinsave_wealth',
   REMITTANCES: 'coinsave_remittances',
-  UPCOMING: 'coinsave_upcoming', // Added for upcoming bills
+  UPCOMING: 'coinsave_upcoming',
 };
 
-// --- Helper Functions ---
-
-// Fetch data from localStorage or return an empty array if nothing exists yet
 const getData = (key) => {
   const data = localStorage.getItem(key);
   return data ? JSON.parse(data) : [];
 };
 
-// Save data back to localStorage
 const saveData = (key, data) => {
   localStorage.setItem(key, JSON.stringify(data));
 };
 
-// Generate a unique ID (since we don't have a database to do it for us)
 const generateId = () => {
   return typeof crypto.randomUUID === 'function' 
     ? crypto.randomUUID() 
     : Date.now().toString(36) + Math.random().toString(36).substring(2);
 };
 
-// Simulate a slight network delay so your loading spinners still work properly
 const simulateNetwork = () => new Promise(resolve => setTimeout(resolve, 150));
 
-
-// --- API Object ---
-
 export const api = {
-  // TRANSACTIONS
+  // --- TRANSACTIONS ---
   getTransactions: async () => {
     await simulateNetwork();
     return getData(STORAGE_KEYS.TRANSACTIONS);
@@ -124,13 +113,12 @@ export const api = {
   createTransaction: async (data) => {
     await simulateNetwork();
     const transactions = getData(STORAGE_KEYS.TRANSACTIONS);
-    
+    // FIX: Respect provided ID (important for remit twins)
     const newItem = { 
       ...data, 
-      id: generateId(), 
+      id: data.id || generateId(), 
       createdAt: new Date().toISOString() 
     };
-    
     transactions.push(newItem);
     saveData(STORAGE_KEYS.TRANSACTIONS, transactions);
     return newItem;
@@ -139,11 +127,10 @@ export const api = {
   updateTransaction: async (id, data) => {
     await simulateNetwork();
     const transactions = getData(STORAGE_KEYS.TRANSACTIONS);
-    const index = transactions.findIndex(t => t.id === id);
+    const index = transactions.findIndex(t => t.id === id || t._id === id);
     
-    if (index === -1) throw new Error('Transaction not found in local storage');
+    if (index === -1) return null; // Store handles "Add if missing"
     
-    // Merge the existing transaction data with the updated fields
     transactions[index] = { 
       ...transactions[index], 
       ...data, 
@@ -157,55 +144,12 @@ export const api = {
   deleteTransaction: async (id) => {
     await simulateNetwork();
     const transactions = getData(STORAGE_KEYS.TRANSACTIONS);
-    
-    const filteredTransactions = transactions.filter(t => t.id !== id);
-    saveData(STORAGE_KEYS.TRANSACTIONS, filteredTransactions);
+    const filtered = transactions.filter(t => t.id !== id && t._id !== id);
+    saveData(STORAGE_KEYS.TRANSACTIONS, filtered);
     return true;
   },
 
-  // WEALTH
-  getWealth: async () => {
-    await simulateNetwork();
-    return getData(STORAGE_KEYS.WEALTH);
-  },
-
-  createWealthItem: async (data) => {
-    await simulateNetwork();
-    const wealthItems = getData(STORAGE_KEYS.WEALTH);
-    
-    const newItem = { 
-      ...data, 
-      id: generateId(), 
-      createdAt: new Date().toISOString() 
-    };
-    
-    wealthItems.push(newItem);
-    saveData(STORAGE_KEYS.WEALTH, wealthItems);
-    return newItem;
-  },
-
-  // REMITTANCES
-  getRemittances: async () => {
-    await simulateNetwork();
-    return getData(STORAGE_KEYS.REMITTANCES);
-  },
-
-  createRemittance: async (data) => {
-    await simulateNetwork();
-    const remittances = getData(STORAGE_KEYS.REMITTANCES);
-    
-    const newItem = { 
-      ...data, 
-      id: generateId(), 
-      createdAt: new Date().toISOString() 
-    };
-    
-    remittances.push(newItem);
-    saveData(STORAGE_KEYS.REMITTANCES, remittances);
-    return newItem;
-  },
-
-  // UPCOMING BILLS / EXPENSES
+  // --- UPCOMING ---
   getUpcoming: async () => {
     await simulateNetwork();
     return getData(STORAGE_KEYS.UPCOMING);
@@ -214,13 +158,7 @@ export const api = {
   createUpcoming: async (data) => {
     await simulateNetwork();
     const upcoming = getData(STORAGE_KEYS.UPCOMING);
-    
-    const newItem = { 
-      ...data, 
-      id: generateId(), 
-      createdAt: new Date().toISOString() 
-    };
-    
+    const newItem = { ...data, id: generateId(), createdAt: new Date().toISOString() };
     upcoming.push(newItem);
     saveData(STORAGE_KEYS.UPCOMING, upcoming);
     return newItem;
@@ -229,16 +167,9 @@ export const api = {
   updateUpcoming: async (id, data) => {
     await simulateNetwork();
     const upcoming = getData(STORAGE_KEYS.UPCOMING);
-    const index = upcoming.findIndex(t => t.id === id);
-    
-    if (index === -1) throw new Error('Upcoming bill not found in local storage');
-    
-    upcoming[index] = { 
-      ...upcoming[index], 
-      ...data, 
-      updatedAt: new Date().toISOString() 
-    };
-    
+    const index = upcoming.findIndex(u => u.id === id || u._id === id);
+    if (index === -1) throw new Error('Upcoming bill not found');
+    upcoming[index] = { ...upcoming[index], ...data, updatedAt: new Date().toISOString() };
     saveData(STORAGE_KEYS.UPCOMING, upcoming);
     return upcoming[index];
   },
@@ -246,9 +177,47 @@ export const api = {
   deleteUpcoming: async (id) => {
     await simulateNetwork();
     const upcoming = getData(STORAGE_KEYS.UPCOMING);
+    const filtered = upcoming.filter(u => u.id !== id && u._id !== id);
+    saveData(STORAGE_KEYS.UPCOMING, filtered);
+    return true;
+  },
+
+  // --- REMITTANCES ---
+  getRemittances: async () => {
+    await simulateNetwork();
+    return getData(STORAGE_KEYS.REMITTANCES);
+  },
+
+  createRemittance: async (data) => {
+    await simulateNetwork();
+    const remittances = getData(STORAGE_KEYS.REMITTANCES);
+    const newItem = { ...data, id: generateId(), createdAt: new Date().toISOString() };
+    remittances.push(newItem);
+    saveData(STORAGE_KEYS.REMITTANCES, remittances);
+    return newItem;
+  },
+
+  updateRemittance: async (id, data) => {
+    await simulateNetwork();
+    const remittances = getData(STORAGE_KEYS.REMITTANCES);
+    const index = remittances.findIndex(r => r.id === id || r._id === id);
+    if (index === -1) throw new Error('Remittance record not found');
     
-    const filteredUpcoming = upcoming.filter(t => t.id !== id);
-    saveData(STORAGE_KEYS.UPCOMING, filteredUpcoming);
+    remittances[index] = { 
+      ...remittances[index], 
+      ...data, 
+      updatedAt: new Date().toISOString() 
+    };
+    
+    saveData(STORAGE_KEYS.REMITTANCES, remittances);
+    return remittances[index];
+  },
+
+  deleteRemittance: async (id) => {
+    await simulateNetwork();
+    const remittances = getData(STORAGE_KEYS.REMITTANCES);
+    const filtered = remittances.filter(r => r.id !== id && r._id !== id);
+    saveData(STORAGE_KEYS.REMITTANCES, filtered);
     return true;
   }
 };

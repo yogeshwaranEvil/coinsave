@@ -20,6 +20,7 @@ import LoanDetail from './pages/LoanDetail';
 import Assets from './pages/Assets';
 import Settings from './pages/Settings';
 import RemittanceDetail from './pages/RemittanceDetail';
+import EditRemittance from './pages/EditRemittance';
 
 
 function App() {
@@ -40,11 +41,10 @@ function App() {
           <Route path="/transaction/:id" element={<TransactionDetail />} />
           <Route path="/add-upcoming" element={<AddUpcoming />} />
           <Route path="/edit-transaction/:id" element={<EditTransaction />} />
-
-          {/* 🌍 Cross-Border */}
+          <Route path="/edit-remittance/:id" element={<EditRemittance />} />          {/* 🌍 Cross-Border */}
           <Route path="/remittance" element={<Remittance />} />
           <Route path="/add-remittance" element={<AddRemittance />} />
-          <Route path="/remittance/:id" element={<RemittanceDetail />} />
+          <Route path="/remittance/:id" element={<RemittanceDetail />} />     
           {/* 🏦 Loans (Phase 2 UI) */}
           <Route path="/loans" element={<Loans />} />
           <Route path="/loan/:id" element={<LoanDetail />} />

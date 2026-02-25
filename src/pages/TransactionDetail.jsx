@@ -25,6 +25,9 @@ export default function TransactionDetail() {
   // Find transaction safely using either id format
   const tx = transactions.find((t) => t.id === id || t._id === id);
 
+  // Helper to identify if this is a remittance twin
+  const isRemit = tx?.category === 'Remittance' || (tx?.id && String(tx.id).startsWith('remit-'));
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
@@ -58,11 +61,11 @@ export default function TransactionDetail() {
     }
   };
 
+  const handleEdit = () => {
+    // Normal transaction edit (Logic for remits removed here since button is hidden)
+    navigate(`/edit-transaction/${tx.id || tx._id}`);
+  };
 
-// Change this function inside TransactionDetail.jsx
-const handleEdit = () => {
-  navigate(`/edit-transaction/${tx.id || tx._id}`);
-};
   const safeFxRate = fxRate > 0 ? fxRate : 22.85;
   const convertedAmount = tx.currency === 'AED' 
     ? Number(tx.amount) * safeFxRate 
@@ -148,21 +151,30 @@ const handleEdit = () => {
         </div>
       </div>
 
-      {/* ACTION BUTTONS */}
-      <div className="flex gap-3 mt-6">
-        <button 
-          onClick={handleEdit}
-          className="flex-1 bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 active:scale-[0.98] transition-all rounded-2xl py-4 flex items-center justify-center gap-2 text-white font-semibold text-sm shadow-sm"
-        >
-          <Edit3 size={16} /> Edit
-        </button>
-        <button 
-          onClick={handleDelete}
-          className="flex-1 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 active:scale-[0.98] transition-all rounded-2xl py-4 flex items-center justify-center gap-2 text-rose-500 font-semibold text-sm shadow-sm"
-        >
-          <Trash2 size={16} /> Delete
-        </button>
-      </div>
+      {/* ACTION BUTTONS: Only shown if it is NOT a remittance */}
+      {!isRemit && (
+        <div className="flex gap-3 mt-6">
+          <button 
+            onClick={handleEdit}
+            className="flex-1 bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 active:scale-[0.98] transition-all rounded-2xl py-4 flex items-center justify-center gap-2 text-white font-semibold text-sm shadow-sm"
+          >
+            <Edit3 size={16} /> Edit
+          </button>
+          <button 
+            onClick={handleDelete}
+            className="flex-1 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 active:scale-[0.98] transition-all rounded-2xl py-4 flex items-center justify-center gap-2 text-rose-500 font-semibold text-sm shadow-sm"
+          >
+            <Trash2 size={16} /> Delete
+          </button>
+        </div>
+      )}
+
+      {/* FOOTER NOTE FOR REMITS */}
+      {isRemit && (
+        <p className="text-center text-neutral-600 text-[10px] mt-6 font-medium uppercase tracking-widest">
+          Manage this record in the Remittance section
+        </p>
+      )}
 
     </div>
   );
