@@ -78,7 +78,6 @@
 
 
 
-
 // src/services/api.js
 
 // Define the keys we will use to save data in the browser's localStorage
@@ -86,6 +85,7 @@ const STORAGE_KEYS = {
   TRANSACTIONS: 'coinsave_transactions',
   WEALTH: 'coinsave_wealth',
   REMITTANCES: 'coinsave_remittances',
+  UPCOMING: 'coinsave_upcoming', // Added for upcoming bills
 };
 
 // --- Helper Functions ---
@@ -203,5 +203,52 @@ export const api = {
     remittances.push(newItem);
     saveData(STORAGE_KEYS.REMITTANCES, remittances);
     return newItem;
+  },
+
+  // UPCOMING BILLS / EXPENSES
+  getUpcoming: async () => {
+    await simulateNetwork();
+    return getData(STORAGE_KEYS.UPCOMING);
+  },
+
+  createUpcoming: async (data) => {
+    await simulateNetwork();
+    const upcoming = getData(STORAGE_KEYS.UPCOMING);
+    
+    const newItem = { 
+      ...data, 
+      id: generateId(), 
+      createdAt: new Date().toISOString() 
+    };
+    
+    upcoming.push(newItem);
+    saveData(STORAGE_KEYS.UPCOMING, upcoming);
+    return newItem;
+  },
+
+  updateUpcoming: async (id, data) => {
+    await simulateNetwork();
+    const upcoming = getData(STORAGE_KEYS.UPCOMING);
+    const index = upcoming.findIndex(t => t.id === id);
+    
+    if (index === -1) throw new Error('Upcoming bill not found in local storage');
+    
+    upcoming[index] = { 
+      ...upcoming[index], 
+      ...data, 
+      updatedAt: new Date().toISOString() 
+    };
+    
+    saveData(STORAGE_KEYS.UPCOMING, upcoming);
+    return upcoming[index];
+  },
+
+  deleteUpcoming: async (id) => {
+    await simulateNetwork();
+    const upcoming = getData(STORAGE_KEYS.UPCOMING);
+    
+    const filteredUpcoming = upcoming.filter(t => t.id !== id);
+    saveData(STORAGE_KEYS.UPCOMING, filteredUpcoming);
+    return true;
   }
 };

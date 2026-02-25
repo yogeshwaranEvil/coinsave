@@ -1,213 +1,169 @@
 // src/pages/TransactionDetail.jsx
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2, Calendar, Tag, FileText, Globe, Edit2, Save, X } from 'lucide-react';
-import { api } from '../services/api';
 import { useAppStore } from '../store/useAppStore';
 import { formatMoney } from '../utils/helpers';
+import { ArrowLeft, Trash2, Edit3, Calendar, Tag, FileText, Globe, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 
 export default function TransactionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { fxRate } = useAppStore();
   
-  const [tx, setTx] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Edit Form State
-  const [editData, setEditData] = useState({
-    amount: '', category: '', notes: '', date: ''
-  });
+  const { transactions, fetchTransactions, deleteTransaction, fxRate } = useAppStore();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    api.getTransactions().then(data => {
-      const found = data.find(item => item._id === id);
-      if (found) {
-        setTx(found);
-        setEditData({
-          amount: found.amount,
-          category: found.category,
-          notes: found.notes || '',
-          date: new Date(found.date).toISOString().split('T')[0]
-        });
+    const loadData = async () => {
+      if (transactions.length === 0) {
+        await fetchTransactions();
       }
-    }).catch(console.error);
-  }, [id]);
+      setIsLoading(false);
+    };
+    loadData();
+  }, [transactions.length, fetchTransactions]);
+
+  // Find transaction safely using either id format
+  const tx = transactions.find((t) => t.id === id || t._id === id);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
+        <div className="text-neutral-500 animate-pulse text-sm font-medium">Loading details...</div>
+      </div>
+    );
+  }
+
+  if (!tx) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-950 p-5 space-y-4">
+        <div className="w-16 h-16 bg-neutral-900 rounded-full flex items-center justify-center text-neutral-600 mb-2">
+          <FileText size={24} />
+        </div>
+        <p className="text-neutral-400 text-sm">Transaction not found or deleted.</p>
+        <button 
+          onClick={() => navigate('/transactions', { replace: true })} 
+          className="px-6 py-2.5 bg-neutral-900 hover:bg-neutral-800 transition-colors border border-neutral-800 rounded-xl text-white font-medium text-sm mt-4"
+        >
+          Back to Transactions
+        </button>
+      </div>
+    );
+  }
 
   const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete this record?")) return;
-    setIsDeleting(true);
-    try {
-      await api.deleteTransaction(id);
-      navigate(-1);
-    } catch (err) {
-      alert("Failed to delete");
-      setIsDeleting(false);
+    const confirmDelete = window.confirm("Are you sure you want to delete this transaction?");
+    if (confirmDelete) {
+      await deleteTransaction(tx.id || tx._id);
+      navigate('/transactions', { replace: true });
     }
   };
 
-  const handleUpdate = async () => {
-    setIsSaving(true);
-    try {
-      const updatedTx = await api.updateTransaction(id, {
-        ...tx, // Keep original type and currency
-        amount: parseFloat(editData.amount),
-        category: editData.category,
-        notes: editData.notes,
-        date: new Date(editData.date).toISOString()
-      });
-      setTx(updatedTx);
-      setIsEditing(false); // Close edit mode
-    } catch (err) {
-      alert("Failed to update transaction");
-    } finally {
-      setIsSaving(false);
-    }
+  const handleEdit = () => {
+    const route = tx.type === 'income' ? '/add-income' : '/add-expense';
+    navigate(`${route}?edit=${tx.id || tx._id}`);
   };
 
-  if (!tx) return <div className="p-5 text-center text-neutral-500 mt-20 animate-pulse">Loading record...</div>;
-
+  const safeFxRate = fxRate > 0 ? fxRate : 22.85;
+  const convertedAmount = tx.currency === 'AED' 
+    ? Number(tx.amount) * safeFxRate 
+    : Number(tx.amount) / safeFxRate;
+  
+  const convertedCurrency = tx.currency === 'AED' ? 'INR' : 'AED';
   const isIncome = tx.type === 'income';
-  const colorClass = isIncome ? 'text-emerald-400' : 'text-rose-400';
-  const bgClass = isIncome ? 'bg-emerald-500/10' : 'bg-rose-500/10';
-  const equivalentAmount = tx.currency === 'AED' ? (tx.amount * fxRate) : (tx.amount / fxRate);
-  const oppositeCurrency = tx.currency === 'AED' ? 'INR' : 'AED';
 
   return (
-    <div className="min-h-screen bg-neutral-950 flex flex-col animate-in slide-in-from-right-4 duration-300">
+    <div className="min-h-screen bg-neutral-950 p-5 animate-in slide-in-from-right-4 duration-300 pb-24">
       
       {/* HEADER */}
-      <div className="px-5 pt-8 pb-4 flex items-center justify-between border-b border-neutral-900">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-neutral-400 hover:text-white transition-colors">
-          <ArrowLeft size={24} />
-        </button>
-        <h1 className="text-sm font-bold text-neutral-400 uppercase tracking-wider">
-          {isEditing ? 'Edit Transaction' : 'Transaction Details'}
-        </h1>
+      <div className="flex items-center justify-between mb-8">
         <button 
-          onClick={() => setIsEditing(!isEditing)} 
-          className={`p-2 -mr-2 transition-colors ${isEditing ? 'text-rose-400' : 'text-blue-400 hover:text-blue-300'}`}
+          onClick={() => navigate(-1)} 
+          className="w-10 h-10 bg-neutral-900 border border-neutral-800 rounded-full flex items-center justify-center text-neutral-400 active:scale-95 transition-all"
         >
-          {isEditing ? <X size={20} /> : <Edit2 size={20} />}
+          <ArrowLeft size={20} />
+        </button>
+        <h1 className="text-sm font-bold text-neutral-300 tracking-wider uppercase">Receipt</h1>
+        <div className="w-10"></div>
+      </div>
+
+      {/* BIG AMOUNT DISPLAY */}
+      <div className="flex flex-col items-center justify-center py-6 mb-4">
+        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${isIncome ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+          {isIncome ? <ArrowDownRight size={24} /> : <ArrowUpRight size={24} />}
+        </div>
+        
+        <span className={`text-xs font-bold tracking-wider uppercase mb-2 ${isIncome ? 'text-emerald-500' : 'text-rose-500'}`}>
+          {isIncome ? 'Income' : 'Expense'}
+        </span>
+        
+        <div className={`text-5xl font-bold tracking-tighter ${isIncome ? 'text-emerald-400' : 'text-white'}`}>
+          {!isIncome && '-'}{formatMoney(tx.amount, tx.currency === 'AED', safeFxRate, tx.currency)}
+        </div>
+        
+        <div className="text-neutral-400 mt-3 font-medium flex items-center gap-1.5 bg-neutral-900/80 border border-neutral-800 px-4 py-1.5 rounded-full text-xs shadow-sm">
+          <Globe size={12} className={isIncome ? 'text-emerald-500' : 'text-indigo-400'} />
+          ≈ {formatMoney(convertedAmount, convertedCurrency === 'AED', safeFxRate, convertedCurrency)}
+        </div>
+      </div>
+
+      {/* RECEIPT CARD */}
+      <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-6 space-y-6 relative overflow-hidden shadow-xl shadow-black/20">
+        
+        <div className="flex items-center space-x-4">
+          <div className="w-10 h-10 rounded-xl bg-neutral-800/80 flex items-center justify-center text-neutral-400 shrink-0">
+            <Calendar size={18} />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Date</p>
+            <p className="text-sm font-medium text-neutral-200 mt-0.5">
+              {new Date(tx.date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+            </p>
+          </div>
+        </div>
+
+        <div className="h-px w-full bg-neutral-800/50"></div>
+
+        <div className="flex items-center space-x-4">
+          <div className="w-10 h-10 rounded-xl bg-neutral-800/80 flex items-center justify-center text-neutral-400 shrink-0">
+            <Tag size={18} />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Category</p>
+            <p className="text-sm font-medium text-neutral-200 mt-0.5">{tx.category}</p>
+          </div>
+        </div>
+
+        <div className="h-px w-full bg-neutral-800/50"></div>
+
+        <div className="flex items-start space-x-4">
+          <div className="w-10 h-10 rounded-xl bg-neutral-800/80 flex items-center justify-center text-neutral-400 shrink-0">
+            <FileText size={18} />
+          </div>
+          <div className="flex-1">
+            <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Notes</p>
+            <p className="text-sm font-medium text-neutral-300 mt-0.5 leading-relaxed">
+              {tx.notes || <span className="text-neutral-600 italic">No notes provided.</span>}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ACTION BUTTONS */}
+      <div className="flex gap-3 mt-6">
+        <button 
+          onClick={handleEdit}
+          className="flex-1 bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 active:scale-[0.98] transition-all rounded-2xl py-4 flex items-center justify-center gap-2 text-white font-semibold text-sm shadow-sm"
+        >
+          <Edit3 size={16} /> Edit
+        </button>
+        <button 
+          onClick={handleDelete}
+          className="flex-1 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 active:scale-[0.98] transition-all rounded-2xl py-4 flex items-center justify-center gap-2 text-rose-500 font-semibold text-sm shadow-sm"
+        >
+          <Trash2 size={16} /> Delete
         </button>
       </div>
 
-      <div className="p-5 flex-1 space-y-6">
-        
-        {/* BIG AMOUNT HEADER */}
-        <div className="flex flex-col items-center justify-center py-6">
-          <div className={`p-4 rounded-full ${bgClass} mb-4`}>
-            <Tag size={32} className={isIncome ? "text-emerald-500" : "text-rose-500"} />
-          </div>
-          
-          {isEditing ? (
-            <div className="flex items-center gap-2">
-              <span className={`text-3xl font-bold ${colorClass}`}>{isIncome ? '+' : '-'}</span>
-              <input 
-                type="number" 
-                value={editData.amount} 
-                onChange={e => setEditData({...editData, amount: e.target.value})}
-                className={`bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2 text-3xl font-bold ${colorClass} w-40 text-center outline-none focus:border-blue-500`}
-              />
-              <span className="text-xl font-normal text-neutral-400">{tx.currency}</span>
-            </div>
-          ) : (
-            <>
-              <div className={`text-4xl font-bold ${colorClass}`}>
-                {isIncome ? '+' : '-'}{tx.amount.toLocaleString()} <span className="text-xl font-normal">{tx.currency}</span>
-              </div>
-              <div className="text-sm text-neutral-500 mt-2 font-medium">
-                ≈ {equivalentAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {oppositeCurrency}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* DETAILS CARD */}
-        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden space-y-1">
-          
-          {/* CATEGORY */}
-          <div className="flex items-center gap-4 p-4 border-b border-neutral-800">
-            <Globe className="text-indigo-400" size={20} />
-            <div className="flex-1">
-              <div className="text-[10px] text-neutral-500 uppercase tracking-wide">Category</div>
-              {isEditing ? (
-                <input 
-                  type="text" 
-                  value={editData.category}
-                  onChange={e => setEditData({...editData, category: e.target.value})}
-                  className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 mt-1 text-white outline-none focus:border-blue-500"
-                />
-              ) : (
-                <div className="text-white font-medium">{tx.category}</div>
-              )}
-            </div>
-          </div>
-
-          {/* DATE */}
-          <div className="flex items-center gap-4 p-4 border-b border-neutral-800">
-            <Calendar className="text-blue-400" size={20} />
-            <div className="flex-1">
-              <div className="text-[10px] text-neutral-500 uppercase tracking-wide">Date</div>
-              {isEditing ? (
-                <input 
-                  type="date" 
-                  value={editData.date}
-                  onChange={e => setEditData({...editData, date: e.target.value})}
-                  className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 mt-1 text-white outline-none focus:border-blue-500"
-                />
-              ) : (
-                <div className="text-white font-medium">{new Date(tx.date).toLocaleDateString()}</div>
-              )}
-            </div>
-          </div>
-
-          {/* NOTES */}
-          <div className="flex items-start gap-4 p-4">
-            <FileText className="text-yellow-400 mt-1" size={20} />
-            <div className="flex-1">
-              <div className="text-[10px] text-neutral-500 uppercase tracking-wide">Notes</div>
-              {isEditing ? (
-                <input 
-                  type="text" 
-                  placeholder="Add a note..."
-                  value={editData.notes}
-                  onChange={e => setEditData({...editData, notes: e.target.value})}
-                  className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 mt-1 text-white outline-none focus:border-blue-500"
-                />
-              ) : (
-                <div className="text-white font-medium">{tx.notes || <span className="text-neutral-600 italic">No notes</span>}</div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ACTION BUTTONS */}
-        <div className="pt-6 space-y-3">
-          {isEditing ? (
-            <button 
-              onClick={handleUpdate}
-              disabled={isSaving}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50"
-            >
-              <Save size={20} />
-              {isSaving ? 'Saving Changes...' : 'Save Changes'}
-            </button>
-          ) : (
-            <button 
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="w-full flex items-center justify-center gap-2 bg-neutral-900 border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 font-bold py-4 rounded-2xl transition-all disabled:opacity-50"
-            >
-              <Trash2 size={20} />
-              {isDeleting ? 'Deleting...' : 'Delete Record'}
-            </button>
-          )}
-        </div>
-
-      </div>
     </div>
   );
 }

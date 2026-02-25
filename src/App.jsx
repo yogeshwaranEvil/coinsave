@@ -1,8 +1,9 @@
 // src/App.jsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import BottomNav from './components/layout/BottomNav';
-
-// Pages (We will create these one by one)
+import AddUpcoming from './pages/AddUpcoming';
+import UpcomingBills from './pages/UpcomingBills';
+// Pages
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import TransactionDetail from './pages/TransactionDetail';
@@ -14,6 +15,7 @@ import Loans from './pages/Loans';
 import LoanDetail from './pages/LoanDetail';
 import Assets from './pages/Assets';
 import Settings from './pages/Settings';
+
 
 function App() {
   return (
@@ -27,11 +29,11 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/add-expense" element={<AddExpense />} />
           <Route path="/add-income" element={<AddIncome />} />
-          
+          <Route path="/upcoming-bills" element = {<UpcomingBills />} />
           {/* 📊 Transactions */}
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/transaction/:id" element={<TransactionDetail />} />
-          
+          <Route path="/add-upcoming" element={<AddUpcoming />} />
           {/* 🌍 Cross-Border */}
           <Route path="/remittance" element={<Remittance />} />
           <Route path="/add-remittance" element={<AddRemittance />} />
