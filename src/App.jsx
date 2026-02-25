@@ -3,6 +3,10 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import BottomNav from './components/layout/BottomNav';
 import AddUpcoming from './pages/AddUpcoming';
 import UpcomingBills from './pages/UpcomingBills';
+// Add this import
+import EditTransaction from './pages/EditTransaction';
+
+// Add this inside your <Routes>
 // Pages
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
@@ -15,6 +19,7 @@ import Loans from './pages/Loans';
 import LoanDetail from './pages/LoanDetail';
 import Assets from './pages/Assets';
 import Settings from './pages/Settings';
+import RemittanceDetail from './pages/RemittanceDetail';
 
 
 function App() {
@@ -34,10 +39,12 @@ function App() {
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/transaction/:id" element={<TransactionDetail />} />
           <Route path="/add-upcoming" element={<AddUpcoming />} />
+          <Route path="/edit-transaction/:id" element={<EditTransaction />} />
+
           {/* 🌍 Cross-Border */}
           <Route path="/remittance" element={<Remittance />} />
           <Route path="/add-remittance" element={<AddRemittance />} />
-          
+          <Route path="/remittance/:id" element={<RemittanceDetail />} />
           {/* 🏦 Loans (Phase 2 UI) */}
           <Route path="/loans" element={<Loans />} />
           <Route path="/loan/:id" element={<LoanDetail />} />

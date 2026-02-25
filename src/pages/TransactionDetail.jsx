@@ -58,11 +58,11 @@ export default function TransactionDetail() {
     }
   };
 
-  const handleEdit = () => {
-    const route = tx.type === 'income' ? '/add-income' : '/add-expense';
-    navigate(`${route}?edit=${tx.id || tx._id}`);
-  };
 
+// Change this function inside TransactionDetail.jsx
+const handleEdit = () => {
+  navigate(`/edit-transaction/${tx.id || tx._id}`);
+};
   const safeFxRate = fxRate > 0 ? fxRate : 22.85;
   const convertedAmount = tx.currency === 'AED' 
     ? Number(tx.amount) * safeFxRate 

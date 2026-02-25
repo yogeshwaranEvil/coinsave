@@ -5,7 +5,7 @@ import { api } from '../services/api';
 export const useAppStore = create((set, get) => ({
   // --- PREFERENCES & FX ---
   isAED: true,
-  fxRate: 22.85, // Fallback rate
+  fxRate: 22.85, 
   toggleCurrency: () => set((state) => ({ isAED: !state.isAED })),
   
   fetchLiveFxRate: async () => {
@@ -16,7 +16,7 @@ export const useAppStore = create((set, get) => ({
         set({ fxRate: data.rates.INR });
       }
     } catch (error) {
-      console.error("Failed to fetch live FX rate, using fallback:", error);
+      console.error("Failed to fetch live FX rate:", error);
     }
   },
 
@@ -24,14 +24,13 @@ export const useAppStore = create((set, get) => ({
   transactions: [],
   remittances: [],
   wealth: [],
-  upcomingBills: [], // <-- NEW: Array to hold upcoming expenses
+  upcomingBills: [],
   isLoading: false,
 
   // --- TRANSACTION ACTIONS ---
   fetchTransactions: async () => {
     set({ isLoading: true });
     const data = await api.getTransactions();
-    // Sort newest first
     const sortedData = data.sort((a, b) => new Date(b.date) - new Date(a.date));
     set({ transactions: sortedData, isLoading: false });
   },
@@ -62,7 +61,6 @@ export const useAppStore = create((set, get) => ({
   // --- UPCOMING EXPENSES ACTIONS ---
   fetchUpcoming: async () => {
     const data = await api.getUpcoming();
-    // Sort by closest due date first
     const sortedData = data.sort((a, b) => new Date(a.date) - new Date(b.date));
     set({ upcomingBills: sortedData });
   },
@@ -91,36 +89,70 @@ export const useAppStore = create((set, get) => ({
     }));
   },
 
-  // THE MAGIC FUNCTION: Pay a bill and convert it to a real transaction
   markUpcomingAsPaid: async (bill) => {
     const { addTransaction, deleteUpcoming } = get();
-    
-    // 1. Create a real transaction from the upcoming bill data
     await addTransaction({
       type: 'expense',
       amount: bill.amount,
       currency: bill.currency,
       category: bill.category,
-      date: new Date().toISOString(), // Automatically stamps today's date
+      date: new Date().toISOString(),
       notes: `[Auto-Paid] ${bill.notes || 'Scheduled Bill'}`
     });
-
-    // 2. Remove it from the upcoming list so it disappears from the Dashboard
     await deleteUpcoming(bill.id || bill._id);
   },
 
-  // --- REMITTANCE ACTIONS ---
+  // --- REMITTANCE ACTIONS (SYNCED WITH TRANSACTIONS) ---
   fetchRemittances: async () => {
     const data = await api.getRemittances();
-    const sortedData = data.sort((a, b) => new Date(b.date) - new Date(a.date));
-    set({ remittances: sortedData });
+    set({ remittances: data.sort((a, b) => new Date(b.date) - new Date(a.date)) });
   },
 
-  addRemittance: async (remittanceData) => {
-    const newRemit = await api.createRemittance(remittanceData);
-    set((state) => ({ 
-      remittances: [newRemit, ...state.remittances] 
-    }));
+  addRemittance: async (remitData) => {
+    const { addTransaction } = get();
+    const newRemit = await api.createRemittance(remitData);
+    
+    // Automatically log this as an expense to impact Net Worth
+    await addTransaction({
+      id: `remit-${newRemit.id}`, // Custom ID to link them
+      type: 'expense',
+      amount: newRemit.aed_sent + newRemit.transfer_fee_aed,
+      currency: 'AED',
+      category: 'Remittance',
+      date: newRemit.date,
+      notes: `To: ${newRemit.destination_account} (Rate: ${newRemit.exchange_rate_secured})`
+    });
+
+    set((state) => ({ remittances: [newRemit, ...state.remittances] }));
     return newRemit;
+  },
+
+  updateRemittance: async (id, updatedData) => {
+    const { updateTransaction } = get();
+    const updatedRemit = await api.updateRemittance(id, updatedData);
+    
+    // Update the linked transaction entry
+    await updateTransaction(`remit-${id}`, {
+      amount: updatedRemit.aed_sent + updatedRemit.transfer_fee_aed,
+      date: updatedRemit.date,
+      notes: `To: ${updatedRemit.destination_account} (Rate: ${updatedRemit.exchange_rate_secured})`
+    });
+
+    set((state) => ({
+      remittances: state.remittances.map(r => (r.id === id || r._id === id) ? updatedRemit : r)
+    }));
+    return updatedRemit;
+  },
+
+  deleteRemittance: async (id) => {
+    const { deleteTransaction } = get();
+    await api.deleteRemittance(id);
+    
+    // Remove the linked transaction to restore Net Worth
+    await deleteTransaction(`remit-${id}`);
+    
+    set((state) => ({
+      remittances: state.remittances.filter(r => r.id !== id && r._id !== id)
+    }));
   }
 }));
