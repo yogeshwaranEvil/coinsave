@@ -29,6 +29,7 @@ import LoanRepayment from './pages/LoanRepayment'; // New
 
 // Assets & Wealth
 import Assets from './pages/Assets';
+import AddAsset from './pages/AddAsset';
 
 function App() {
   return (
@@ -64,7 +65,7 @@ function App() {
           
           {/* 🪙 Assets & Wealth */}
           <Route path="/assets" element={<Assets />} />
-          
+          <Route path="/add-asset" element={<AddAsset />} />
           {/* ⚙️ Settings */}
           <Route path="/settings" element={<Settings />} />
         </Routes>
