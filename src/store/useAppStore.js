@@ -201,12 +201,35 @@ export const useAppStore = create((set, get) => ({
     }));
   },
 
+// src/store/useAppStore.js
+
   deleteLoan: async (id) => {
+    const { transactions, deleteTransaction } = get();
+    
+    // 1. Delete the actual Loan from Local Storage/API
     await api.deleteLoan(id);
+    
+    // 2. FIND & DELETE LINKED REPAYMENTS
+    // We look for transactions where the notes include the loan name or repayments
+    // Or if we specifically tagged them (best practice)
+    const linkedRepayments = transactions.filter(tx => 
+      tx.category === 'Loan Repayment' && 
+      (tx.notes.includes(id) || tx.id.startsWith(`repay-${id}`))
+    );
+
+    // Loop through and delete each linked transaction
+    for (const repayTx of linkedRepayments) {
+      await deleteTransaction(repayTx.id || repayTx._id);
+    }
+
+    // 3. Update local state
     set((state) => ({
       loans: state.loans.filter(l => l.id !== id && l._id !== id)
     }));
   },
+
+  // Add/Update these in src/store/useAppStore.js
+// src/store/useAppStore.js
 
   payLoan: async (loanId, paymentAmount, note = '') => {
     const { loans, updateLoan, addTransaction } = get();
@@ -216,7 +239,11 @@ export const useAppStore = create((set, get) => ({
 
     const newPrincipal = Math.max(0, loan.principal - paymentAmount);
 
+    // We add a specific ID prefix: repay-[loanId]-[timestamp]
+    const repaymentId = `repay-${loanId}-${Date.now()}`;
+
     await addTransaction({
+      id: repaymentId, // Tracking ID
       type: 'expense',
       amount: paymentAmount,
       currency: loan.currency,
