@@ -1,92 +1,14 @@
-// // src/services/api.js
-// // const API_URL = 'https://coinsave-backend.onrender.com/api';
-// const API_URL = 'http://localhost:8000/api';
-
-// export const api = {
-
-//   // Add this right below createTransaction in src/services/api.js
-//   updateTransaction: async (id, data) => {
-//     const res = await fetch(`${API_URL}/transactions/${id}`, {
-//       method: 'PUT',
-//       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify(data),
-//     });
-//     if (!res.ok) throw new Error('Failed to update transaction');
-//     return res.json();
-//   },
-// // Add this inside the api object in src/services/api.js
-//   deleteTransaction: async (id) => {
-//     const res = await fetch(`${API_URL}/transactions/${id}`, {
-//       method: 'DELETE',
-//     });
-//     if (!res.ok) throw new Error('Failed to delete transaction');
-//     return true;
-//   },
-// // Add these inside your exported `api` object:
-//   createRemittance: async (data) => {
-//     const res = await fetch(`${API_URL}/remittances/`, {
-//       method: 'POST',
-//       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify(data),
-//     });
-//     if (!res.ok) throw new Error('Failed to create remittance');
-//     return res.json();
-//   },
-
-//   createWealthItem: async (data) => {
-//     const res = await fetch(`${API_URL}/wealth/`, {
-//       method: 'POST',
-//       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify(data),
-//     });
-//     if (!res.ok) throw new Error('Failed to create wealth item');
-//     return res.json();
-//   },
-
-//   // TRANSACTIONS
-//   getTransactions: async () => {
-//     const res = await fetch(`${API_URL}/transactions/`);
-//     if (!res.ok) throw new Error('Failed to fetch transactions');
-//     return res.json();
-//   },
-  
-//   createTransaction: async (data) => {
-//     const res = await fetch(`${API_URL}/transactions/`, {
-//       method: 'POST',
-//       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify(data),
-//     });
-//     if (!res.ok) throw new Error('Failed to create transaction');
-//     return res.json();
-//   },
-
-//   // WEALTH
-//   getWealth: async () => {
-//     const res = await fetch(`${API_URL}/wealth/`);
-//     if (!res.ok) throw new Error('Failed to fetch wealth');
-//     return res.json();
-//   },
-
-//   // REMITTANCES
-//   getRemittances: async () => {
-//     const res = await fetch(`${API_URL}/remittances/`);
-//     if (!res.ok) throw new Error('Failed to fetch remittances');
-//     return res.json();
-//   }
-// };  
-
-
 // src/services/api.js
-// src/services/api.js
-// src/services/api.js
+
 const STORAGE_KEYS = {
   TRANSACTIONS: 'coinsave_transactions',
   WEALTH: 'coinsave_wealth',
   REMITTANCES: 'coinsave_remittances',
   UPCOMING: 'coinsave_upcoming',
-  LOANS: 'coinsave_loans', // NEW
+  LOANS: 'coinsave_loans',
 };
 
+// --- HELPERS ---
 const getData = (key) => {
   const data = localStorage.getItem(key);
   return data ? JSON.parse(data) : [];
@@ -104,6 +26,7 @@ const generateId = () => {
 
 const simulateNetwork = () => new Promise(resolve => setTimeout(resolve, 150));
 
+// --- API EXPORT ---
 export const api = {
   // --- TRANSACTIONS ---
   getTransactions: async () => {
@@ -114,7 +37,12 @@ export const api = {
   createTransaction: async (data) => {
     await simulateNetwork();
     const transactions = getData(STORAGE_KEYS.TRANSACTIONS);
-    const newItem = { ...data, id: data.id || generateId(), createdAt: new Date().toISOString() };
+    // Fix: Respect provided ID (important for remit and loan-repay sync)
+    const newItem = { 
+      ...data, 
+      id: data.id || generateId(), 
+      createdAt: new Date().toISOString() 
+    };
     transactions.push(newItem);
     saveData(STORAGE_KEYS.TRANSACTIONS, transactions);
     return newItem;
@@ -125,7 +53,11 @@ export const api = {
     const transactions = getData(STORAGE_KEYS.TRANSACTIONS);
     const index = transactions.findIndex(t => t.id === id || t._id === id);
     if (index === -1) return null;
-    transactions[index] = { ...transactions[index], ...data, updatedAt: new Date().toISOString() };
+    transactions[index] = { 
+      ...transactions[index], 
+      ...data, 
+      updatedAt: new Date().toISOString() 
+    };
     saveData(STORAGE_KEYS.TRANSACTIONS, transactions);
     return transactions[index];
   },
@@ -138,6 +70,48 @@ export const api = {
     return true;
   },
 
+  // --- UPCOMING BILLS ---
+  getUpcoming: async () => {
+    await simulateNetwork();
+    return getData(STORAGE_KEYS.UPCOMING);
+  },
+
+  createUpcoming: async (data) => {
+    await simulateNetwork();
+    const upcoming = getData(STORAGE_KEYS.UPCOMING);
+    const newItem = { 
+      ...data, 
+      id: generateId(), 
+      createdAt: new Date().toISOString(),
+      status: 'pending' 
+    };
+    upcoming.push(newItem);
+    saveData(STORAGE_KEYS.UPCOMING, upcoming);
+    return newItem;
+  },
+
+  updateUpcoming: async (id, data) => {
+    await simulateNetwork();
+    const upcoming = getData(STORAGE_KEYS.UPCOMING);
+    const index = upcoming.findIndex(u => u.id === id || u._id === id);
+    if (index === -1) throw new Error('Upcoming bill not found');
+    upcoming[index] = { 
+      ...upcoming[index], 
+      ...data, 
+      updatedAt: new Date().toISOString() 
+    };
+    saveData(STORAGE_KEYS.UPCOMING, upcoming);
+    return upcoming[index];
+  },
+
+  deleteUpcoming: async (id) => {
+    await simulateNetwork();
+    const upcoming = getData(STORAGE_KEYS.UPCOMING);
+    const filtered = upcoming.filter(u => u.id !== id && u._id !== id);
+    saveData(STORAGE_KEYS.UPCOMING, filtered);
+    return true;
+  },
+
   // --- LOANS ---
   getLoans: async () => {
     await simulateNetwork();
@@ -147,7 +121,11 @@ export const api = {
   createLoan: async (data) => {
     await simulateNetwork();
     const loans = getData(STORAGE_KEYS.LOANS);
-    const newItem = { ...data, id: generateId(), createdAt: new Date().toISOString() };
+    const newItem = { 
+      ...data, 
+      id: generateId(), 
+      createdAt: new Date().toISOString() 
+    };
     loans.push(newItem);
     saveData(STORAGE_KEYS.LOANS, loans);
     return newItem;
@@ -158,7 +136,11 @@ export const api = {
     const loans = getData(STORAGE_KEYS.LOANS);
     const index = loans.findIndex(l => l.id === id || l._id === id);
     if (index === -1) throw new Error('Loan not found');
-    loans[index] = { ...loans[index], ...data, updatedAt: new Date().toISOString() };
+    loans[index] = { 
+      ...loans[index], 
+      ...data, 
+      updatedAt: new Date().toISOString() 
+    };
     saveData(STORAGE_KEYS.LOANS, loans);
     return loans[index];
   },
@@ -180,7 +162,11 @@ export const api = {
   createRemittance: async (data) => {
     await simulateNetwork();
     const remittances = getData(STORAGE_KEYS.REMITTANCES);
-    const newItem = { ...data, id: generateId(), createdAt: new Date().toISOString() };
+    const newItem = { 
+      ...data, 
+      id: generateId(), 
+      createdAt: new Date().toISOString() 
+    };
     remittances.push(newItem);
     saveData(STORAGE_KEYS.REMITTANCES, remittances);
     return newItem;
@@ -191,7 +177,11 @@ export const api = {
     const remittances = getData(STORAGE_KEYS.REMITTANCES);
     const index = remittances.findIndex(r => r.id === id || r._id === id);
     if (index === -1) throw new Error('Remittance record not found');
-    remittances[index] = { ...remittances[index], ...data, updatedAt: new Date().toISOString() };
+    remittances[index] = { 
+      ...remittances[index], 
+      ...data, 
+      updatedAt: new Date().toISOString() 
+    };
     saveData(STORAGE_KEYS.REMITTANCES, remittances);
     return remittances[index];
   },
@@ -203,6 +193,7 @@ export const api = {
     saveData(STORAGE_KEYS.REMITTANCES, filtered);
     return true;
   },
+
   // --- ASSETS / WEALTH ---
   getAssets: async () => {
     await simulateNetwork();
@@ -212,7 +203,11 @@ export const api = {
   createAsset: async (data) => {
     await simulateNetwork();
     const assets = getData(STORAGE_KEYS.WEALTH);
-    const newItem = { ...data, id: generateId(), createdAt: new Date().toISOString() };
+    const newItem = { 
+      ...data, 
+      id: generateId(), 
+      createdAt: new Date().toISOString() 
+    };
     assets.push(newItem);
     saveData(STORAGE_KEYS.WEALTH, assets);
     return newItem;
@@ -223,7 +218,11 @@ export const api = {
     const assets = getData(STORAGE_KEYS.WEALTH);
     const index = assets.findIndex(a => a.id === id || a._id === id);
     if (index === -1) throw new Error('Asset not found');
-    assets[index] = { ...assets[index], ...data, updatedAt: new Date().toISOString() };
+    assets[index] = { 
+      ...assets[index], 
+      ...data, 
+      updatedAt: new Date().toISOString() 
+    };
     saveData(STORAGE_KEYS.WEALTH, assets);
     return assets[index];
   },

@@ -35,6 +35,7 @@ export default function Dashboard() {
     fetchAssets();
   }, [fetchLiveFxRate, fetchTransactions, fetchUpcoming, fetchLoans, fetchAssets]);
 
+  // Calculations for Monthly Cash Flow
   const { monthlyIncome, monthlyExpense, netSavings, savingsRate } = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -57,18 +58,12 @@ export default function Dashboard() {
     const net = incomeAED - expenseAED;
     const rate = incomeAED > 0 ? ((net / incomeAED) * 100).toFixed(1) : 0;
 
-    return {
-      monthlyIncome: incomeAED,
-      monthlyExpense: expenseAED,
-      netSavings: net,
-      savingsRate: rate
-    };
+    return { monthlyIncome: incomeAED, monthlyExpense: expenseAED, netSavings: net, savingsRate: rate };
   }, [transactions, fxRate]);
 
-  // Use the global net worth (Assets - Loans)
-  const globalWealth = getGlobalNetWorth();
-  const isWealthNegative = globalWealth < 0;
-  const isSavingsNegative = netSavings < 0;
+  // Use Global Intelligence for the main header
+  const totalNetWorth = getGlobalNetWorth();
+  const isNegativeWorth = totalNetWorth < 0;
 
   return (
     <div className="px-5 pt-8 pb-6 space-y-8 animate-in fade-in duration-500 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -77,9 +72,15 @@ export default function Dashboard() {
       <div className="flex justify-between items-start">
         <div className="space-y-1">
           <h1 className="text-[10px] text-neutral-500 font-bold uppercase tracking-[0.2em]">Global Net Worth</h1>
-          <div className={`text-4xl font-black tracking-tighter transition-colors duration-500 ${isWealthNegative ? 'text-rose-500' : 'text-white'}`}>
-            {formatMoney(globalWealth, isAED, fxRate, 'AED')}
+          <div className={`text-4xl font-black tracking-tighter transition-colors duration-500 ${isNegativeWorth ? 'text-rose-500' : 'text-white'}`}>
+            {formatMoney(totalNetWorth, isAED, fxRate, 'AED')}
           </div>
+          {isNegativeWorth && (
+            <div className="flex items-center gap-1.5 text-rose-500/80 animate-pulse">
+              <TrendingDown size={12} />
+              <span className="text-[9px] font-black uppercase tracking-widest">Deficit Warning</span>
+            </div>
+          )}
         </div>
         
         <button 
@@ -91,55 +92,51 @@ export default function Dashboard() {
       </div>
 
       {/* QUICK FX WIDGET */}
-      <div className="bg-neutral-900/50 border border-neutral-800/80 rounded-2xl p-4 flex justify-between items-center text-[10px] font-bold uppercase tracking-widest">
-        <span className="text-neutral-500">FX Pulse</span>
-        <span className="text-emerald-500 font-mono">
-          1 AED = ₹{fxRate ? fxRate.toFixed(2) : '...'}
-        </span>
+      <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-4 flex justify-between items-center text-[10px] font-bold tracking-[0.1em]">
+        <span className="text-neutral-500 uppercase">Live Pulse</span>
+        <span className="text-emerald-500 font-mono">1 AED = ₹{fxRate ? fxRate.toFixed(2) : '...'}</span>
       </div>
 
-      {/* MONTHLY STATUS CARD (RED ALERT MODE) */}
+      {/* MONTHLY STATUS CARD */}
       <div className={`relative overflow-hidden rounded-[32px] p-6 transition-all duration-700 border ${
-        isSavingsNegative 
-        ? 'bg-rose-500/10 border-rose-500/20' 
-        : 'bg-emerald-500/10 border-emerald-500/20'
+        netSavings < 0 ? 'bg-rose-500/10 border-rose-500/20' : 'bg-emerald-500/10 border-emerald-500/20'
       }`}>
-        {/* Abstract Glow Background */}
+        {/* Glow Background */}
         <div className={`absolute -top-24 -right-24 w-48 h-48 blur-[80px] rounded-full opacity-40 ${
-          isSavingsNegative ? 'bg-rose-500' : 'bg-emerald-500'
+          netSavings < 0 ? 'bg-rose-500' : 'bg-emerald-500'
         }`}></div>
 
         <div className="flex justify-between items-start relative z-10">
           <div>
             <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${
-              isSavingsNegative ? 'text-rose-400' : 'text-emerald-400'
+              netSavings < 0 ? 'text-rose-400' : 'text-emerald-400'
             }`}>
-              {isSavingsNegative ? 'Monthly Deficit' : 'Net Savings'}
+              {netSavings < 0 ? 'Monthly Shortfall' : 'Net Savings'}
             </p>
             <h2 className="text-3xl font-black text-white">
               {formatMoney(netSavings, isAED, fxRate, 'AED')}
             </h2>
           </div>
           <div className={`p-3 rounded-2xl ${
-            isSavingsNegative ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'
+            netSavings < 0 ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'
           }`}>
-            {isSavingsNegative ? <TrendingDown size={24} /> : <TrendingUp size={24} />}
+            {netSavings < 0 ? <TrendingDown size={24} /> : <TrendingUp size={24} />}
           </div>
         </div>
 
         <div className="mt-6 flex items-center justify-between relative z-10">
           <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${
-             isSavingsNegative ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-neutral-950'
+             netSavings < 0 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-neutral-950'
           }`}>
             Efficiency: {savingsRate}%
           </div>
-          <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-tighter">
-            {isSavingsNegative ? 'Warning: Spending exceeds income' : 'Positive cash flow detected'}
+          <p className="text-[10px] font-bold text-neutral-500 uppercase">
+            {netSavings < 0 ? 'Spend Alert' : 'Positive Momentum'}
           </p>
         </div>
       </div>
 
-      {/* MONTHLY CASH FLOW TILES */}
+      {/* INCOME / EXPENSE SPLIT */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-neutral-900/40 border border-neutral-800 rounded-3xl p-5">
           <div className="flex items-center gap-2 text-emerald-500 mb-3">
@@ -179,12 +176,12 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* UPCOMING OBLIGATIONS CAROUSEL */}
+      {/* UPCOMING OBLIGATIONS */}
       {upcomingBills.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em]">Upcoming</h2>
-            <button onClick={() => navigate('/upcoming-bills')} className="text-indigo-400 text-[10px] font-bold uppercase tracking-widest">View All</button>
+            <h2 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em]">Scheduled</h2>
+            <button onClick={() => navigate('/upcoming-bills')} className="text-indigo-400 text-[10px] font-bold uppercase tracking-widest">Manage</button>
           </div>
           
           <div className="flex gap-4 overflow-x-auto pb-4 snap-x [&::-webkit-scrollbar]:hidden">
@@ -196,7 +193,7 @@ export default function Dashboard() {
                   </div>
                   <div className="text-right">
                     <div className="text-xl font-black text-white">{formatMoney(bill.amount, bill.currency === 'AED', fxRate, bill.currency)}</div>
-                    <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-tighter mt-1">Due {new Date(bill.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                    <p className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Due {new Date(bill.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
                   </div>
                 </div>
                 <button 
