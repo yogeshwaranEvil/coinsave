@@ -301,22 +301,55 @@ export const useAppStore = create((set, get) => ({
   },
 
   // --- GLOBAL INTELLIGENCE ---
-  getGlobalNetWorth: () => {
-    const { wealth, loans, fxRate } = get();
+ getGlobalNetWorth: () => {
+    const { wealth, loans, fxRate, metalRates, isAED } = get();
+    const safeFx = fxRate || 22.85;
     
-    // Total Assets in AED
-    const totalAssetsAED = wealth.reduce((acc, asset) => {
-      const val = asset.currency === 'INR' ? asset.value / fxRate : asset.value;
-      return acc + val;
+    // Ensure metalRates exists, otherwise use hardcoded fallbacks
+    const rates = metalRates || { gold_aed: 310, silver_aed: 3.5, gold_inr: 7200, silver_inr: 95 };
+
+    const assetsAED = wealth.reduce((acc, asset) => {
+      let assetValueAED = 0;
+
+      if (asset.category === 'commodity') {
+        const isGold = asset.metalType === 'gold';
+        // Pick base rate (24K Gold or Spot Silver)
+        const baseRate = isGold ? rates.gold_aed : rates.silver_aed;
+        
+        let purityFactor = 1;
+        if (isGold) {
+          // Convert '22K' string to numerical ratio (22/24)
+          const caratValue = parseInt(asset.purity) || 24;
+          purityFactor = caratValue / 24;
+        } else {
+          // Silver purity factor (999 = 1, 925 = 0.925)
+          purityFactor = asset.purity === '925' ? 0.925 : 1;
+        }
+
+        assetValueAED = (Number(asset.grams) || 0) * baseRate * purityFactor;
+      } 
+      else if (asset.category === 'market') {
+        const totalVal = (Number(asset.quantity) || 0) * (Number(asset.currentPrice) || 0);
+        assetValueAED = asset.currency === 'INR' ? totalVal / safeFx : totalVal;
+      } 
+      else {
+        // Liquid assets
+        const val = Number(asset.value) || Number(asset.totalValue) || 0;
+        assetValueAED = asset.currency === 'INR' ? val / safeFx : val;
+      }
+
+      return acc + assetValueAED;
     }, 0);
 
-    // Total Loans in AED
-    const totalLoansAED = loans.reduce((acc, loan) => {
-      const val = loan.currency === 'INR' ? loan.principal / fxRate : loan.principal;
-      return acc + val;
+    const debtsAED = loans.reduce((acc, loan) => {
+      const loanVal = Number(loan.principal) || 0;
+      return acc + (loan.currency === 'INR' ? loanVal / safeFx : loanVal);
     }, 0);
 
-    return totalAssetsAED - totalLoansAED;
+    const finalNetWorthAED = assetsAED - debtsAED;
+
+    // Return based on user's current toggle (AED or INR)
+    return isAED ? finalNetWorthAED : finalNetWorthAED * safeFx;
   }
   ,
   metalRates: { gold_aed: 620, silver_aed: 12, gold_inr: 16200, silver_inr: 300 },
@@ -326,26 +359,5 @@ export const useAppStore = create((set, get) => ({
     if (rates) set({ metalRates: rates });
   },
 
-  getGlobalNetWorth: () => {
-    const { wealth, loans, fxRate, metalRates } = get();
-    
-    const assetsAED = wealth.reduce((acc, asset) => {
-      if (asset.category === 'commodity') {
-        const isGold = asset.name.toLowerCase().includes('gold');
-        const rate = asset.currency === 'AED' 
-          ? (isGold ? metalRates.gold_aed : metalRates.silver_aed)
-          : (isGold ? metalRates.gold_inr : metalRates.silver_inr) / fxRate;
-        return acc + (asset.grams * rate);
-      }
-      const val = asset.currency === 'INR' ? asset.value / fxRate : asset.value;
-      return acc + val;
-    }, 0);
-
-    const debtsAED = loans.reduce((acc, loan) => {
-      const val = loan.currency === 'INR' ? loan.principal / fxRate : loan.principal;
-      return acc + val;
-    }, 0);
-
-    return assetsAED - debtsAED;
-  },
+  
 }));  

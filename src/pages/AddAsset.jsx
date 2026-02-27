@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { 
-  ArrowLeft, Wallet, TrendingUp, Coins, Save, Building2, Layers, Scale 
+  ArrowLeft, Wallet, TrendingUp, Coins, Save, Scale 
 } from 'lucide-react';
 
 export default function AddAsset() {
@@ -13,33 +13,27 @@ export default function AddAsset() {
   const [formData, setFormData] = useState({
     category: 'liquid',
     name: '',
-    institution: '',
     currency: isAED ? 'AED' : 'INR',
-    // Unit-based fields
-    quantity: '', // For stocks/market
-    currentPrice: '', // For stocks/market
-    grams: '', // For Commodities
-    totalValue: '', // Manual entry for Liquid
+    // Market fields
+    quantity: '',
+    currentPrice: '',
+    // Commodity specific fields
+    metalType: 'gold', 
+    purity: '24K',     
+    grams: '',
+    // Liquid field
+    totalValue: '',
     notes: ''
   });
 
-  // Dynamic Calculation Logic
-  const displayValue = useMemo(() => {
-    if (formData.category === 'market') {
-      const val = (Number(formData.quantity) || 0) * (Number(formData.currentPrice) || 0);
-      return `${formData.currency} ${val.toLocaleString()}`;
-    }
-    if (formData.category === 'commodity') {
-      return `${formData.grams || 0} Grams`;
-    }
-    return `${formData.currency} ${(Number(formData.totalValue) || 0).toLocaleString()}`;
-  }, [formData]);
+  const purityOptions = {
+    gold: ['24K', '22K', '21K', '18K'],
+    silver: ['999', '925']
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // For gold, we save it with 0 value initially or we can integrate a live price later
-    // For now, we store the grams as the primary value
     const finalValue = formData.category === 'market' 
       ? (Number(formData.quantity) * Number(formData.currentPrice))
       : Number(formData.totalValue) || 0;
@@ -58,147 +52,180 @@ export default function AddAsset() {
     <div className="min-h-screen bg-neutral-950 p-5 animate-in slide-in-from-bottom-4 pb-24">
       {/* HEADER */}
       <div className="flex items-center justify-between mb-8">
-        <button onClick={() => navigate(-1)} className="w-10 h-10 bg-neutral-900 border border-neutral-800 rounded-full flex items-center justify-center text-neutral-400 active:scale-90 transition-all">
+        <button onClick={() => navigate(-1)} className="w-10 h-10 bg-neutral-900 border border-neutral-800 rounded-full flex items-center justify-center text-neutral-400">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-sm font-bold text-white uppercase tracking-widest">New Asset</h1>
+        <h1 className="text-[10px] font-black text-white uppercase tracking-[0.3em]">New Asset</h1>
         <div className="w-10"></div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-8">
         
-        {/* DYNAMIC DISPLAY HEADER */}
-        <div className="bg-neutral-900 border border-neutral-800 rounded-[32px] p-8 flex flex-col items-center shadow-2xl relative overflow-hidden">
-           <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/10 blur-3xl rounded-full"></div>
-           <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-3">
-             {formData.category === 'commodity' ? 'Total Weight' : 'Estimated Value'}
-           </p>
-           <div className="text-4xl font-black text-white tracking-tighter">
-             {displayValue}
-           </div>
-        </div>
-
         {/* CATEGORY SELECTOR */}
         <div className="grid grid-cols-3 gap-3">
           {[
             { id: 'liquid', name: 'Liquid', icon: Wallet },
             { id: 'market', name: 'Market', icon: TrendingUp },
-            { id: 'commodity', name: 'Gold/Silver', icon: Coins }
+            { id: 'commodity', name: 'Metal', icon: Coins }
           ].map((cat) => (
             <button
               key={cat.id}
               type="button"
               onClick={() => setFormData({...formData, category: cat.id})}
-              className={`flex flex-col items-center py-4 rounded-2xl border transition-all ${
-                formData.category === cat.id ? 'bg-indigo-500/10 border-indigo-500 text-indigo-400' : 'bg-neutral-900 border-neutral-800 text-neutral-500'
+              className={`flex flex-col items-center py-4 rounded-3xl border transition-all duration-300 ${
+                formData.category === cat.id 
+                ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/40' 
+                : 'bg-neutral-900 border-neutral-800 text-neutral-500'
               }`}
             >
               <cat.icon size={20} className="mb-2" />
-              <span className="text-[10px] font-black uppercase tracking-tighter">{cat.name}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest">{cat.name}</span>
             </button>
           ))}
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* NAME FIELD */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-neutral-500 uppercase ml-1">Asset Name</label>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-neutral-500 uppercase ml-1 tracking-widest">Asset Name</label>
             <input 
               type="text" required
               value={formData.name}
               onChange={(e) => setFormData({...formData, name: e.target.value})}
-              placeholder={formData.category === 'commodity' ? "e.g., 24K Gold Bar, Jewelry" : "e.g., Apple Stocks, Bank Balance"}
-              className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-white outline-none focus:border-indigo-500/30"
+              placeholder="e.g., Gold Chain, SBI Savings"
+              className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-5 text-white outline-none focus:border-indigo-500/50 transition-all placeholder:text-neutral-700 font-bold"
             />
           </div>
 
-          {/* DYNAMIC FIELDS BASED ON CATEGORY */}
-          
-          {/* 1. MARKET MODE */}
+          {/* DYNAMIC METAL SECTION */}
+          {formData.category === 'commodity' && (
+            <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+              
+              {/* METAL TYPE TOGGLE */}
+              <div className="flex bg-neutral-900 p-1.5 rounded-2xl border border-neutral-800">
+                <button
+                  type="button"
+                  onClick={() => setFormData({...formData, metalType: 'gold', purity: '24K'})}
+                  className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${formData.metalType === 'gold' ? 'bg-amber-500 text-neutral-950 shadow-lg' : 'text-neutral-500'}`}
+                >
+                  Gold
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({...formData, metalType: 'silver', purity: '999'})}
+                  className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${formData.metalType === 'silver' ? 'bg-neutral-200 text-neutral-950 shadow-lg' : 'text-neutral-500'}`}
+                >
+                  Silver
+                </button>
+              </div>
+
+              {/* PURITY TOGGLE BUTTONS (The "Touch" or "Carat" Buttons) */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-neutral-500 uppercase ml-1 tracking-widest">
+                  {formData.metalType === 'gold' ? 'Carat Value' : 'Touch / Purity'}
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {purityOptions[formData.metalType].map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setFormData({...formData, purity: opt})}
+                      className={`py-3 rounded-xl text-[10px] font-black border transition-all ${
+                        formData.purity === opt 
+                        ? 'bg-neutral-100 border-white text-neutral-950 shadow-md' 
+                        : 'bg-neutral-900 border-neutral-800 text-neutral-400'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* GRAMS INPUT */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-neutral-500 uppercase ml-1 tracking-widest">Weight (Grams)</label>
+                <div className="relative">
+                  <Scale className="absolute left-5 top-5 text-neutral-600" size={18} />
+                  <input 
+                    type="number" step="0.01" required
+                    value={formData.grams}
+                    onChange={(e) => setFormData({...formData, grams: e.target.value})}
+                    placeholder="0.00"
+                    className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl py-5 pl-14 pr-5 text-white outline-none font-bold text-lg"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MARKET SECTION */}
           {formData.category === 'market' && (
-            <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-neutral-500 uppercase ml-1 flex items-center gap-1"><Layers size={10}/> Quantity</label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-neutral-500 uppercase ml-1 tracking-widest">Quantity</label>
                 <input 
                   type="number" required
                   value={formData.quantity}
                   onChange={(e) => setFormData({...formData, quantity: e.target.value})}
-                  placeholder="Units"
-                  className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-white outline-none"
+                  className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-5 text-white outline-none font-bold"
                 />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-neutral-500 uppercase ml-1">Current Price</label>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-neutral-500 uppercase ml-1 tracking-widest">Avg Price</label>
                 <input 
                   type="number" required
                   value={formData.currentPrice}
                   onChange={(e) => setFormData({...formData, currentPrice: e.target.value})}
-                  placeholder="Per Unit"
-                  className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-white outline-none"
+                  className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-5 text-white outline-none font-bold"
                 />
               </div>
             </div>
           )}
 
-          {/* 2. COMMODITY MODE (Pure Weight) */}
-          {formData.category === 'commodity' && (
-            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
-              <label className="text-[10px] font-bold text-neutral-500 uppercase ml-1 flex items-center gap-1">
-                <Scale size={14} className="text-amber-500" /> Total Weight (Grams)
-              </label>
-              <input 
-                type="number" step="0.01" required
-                value={formData.grams}
-                onChange={(e) => setFormData({...formData, grams: e.target.value})}
-                placeholder="0.00g"
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-5 text-2xl font-bold text-white outline-none focus:border-amber-500/30"
-              />
-              <p className="text-[9px] text-neutral-600 font-bold uppercase tracking-widest mt-1 ml-1">Value will be tracked by weight</p>
-            </div>
-          )}
-
-          {/* 3. LIQUID MODE (Simple Value) */}
+          {/* LIQUID SECTION */}
           {formData.category === 'liquid' && (
-            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
-              <label className="text-[10px] font-bold text-neutral-500 uppercase ml-1">Total Balance</label>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-neutral-500 uppercase ml-1 tracking-widest">Balance</label>
               <input 
                 type="number" required
                 value={formData.totalValue}
                 onChange={(e) => setFormData({...formData, totalValue: e.target.value})}
-                placeholder="Current Balance"
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-white outline-none"
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-5 text-white outline-none font-bold text-lg"
               />
             </div>
           )}
 
-          {/* SHARED: INSTITUTION & CURRENCY */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-neutral-500 uppercase ml-1">Institution</label>
-              <input 
-                type="text"
-                value={formData.institution}
-                onChange={(e) => setFormData({...formData, institution: e.target.value})}
-                placeholder="HDFC, Zerodha, etc."
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-white outline-none"
-              />
+          {/* CURRENCY (Only for Non-Metals) */}
+          {formData.category !== 'commodity' && (
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-neutral-500 uppercase ml-1 tracking-widest">Base Currency</label>
+              <div className="flex bg-neutral-900 p-1.5 rounded-2xl border border-neutral-800">
+                <button
+                  type="button"
+                  onClick={() => setFormData({...formData, currency: 'AED'})}
+                  className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${formData.currency === 'AED' ? 'bg-indigo-600 text-white shadow-lg' : 'text-neutral-500'}`}
+                >
+                  AED
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({...formData, currency: 'INR'})}
+                  className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${formData.currency === 'INR' ? 'bg-indigo-600 text-white shadow-lg' : 'text-neutral-500'}`}
+                >
+                  INR
+                </button>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-neutral-500 uppercase ml-1">Currency</label>
-              <select 
-                value={formData.currency}
-                onChange={(e) => setFormData({...formData, currency: e.target.value})}
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-white outline-none appearance-none font-bold"
-              >
-                <option value="AED">AED</option>
-                <option value="INR">INR</option>
-              </select>
-            </div>
-          </div>
+          )}
         </div>
 
-        <button type="submit" className="w-full bg-indigo-600 py-4 rounded-2xl font-black text-white shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs">
-          <Save size={18} /> Record Asset
+        {/* SUBMIT */}
+        <button 
+          type="submit" 
+          className="w-full bg-indigo-600 py-5 rounded-[2rem] font-black text-white shadow-xl shadow-indigo-950/20 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] text-[11px]"
+        >
+          <Save size={18} /> Record Wealth Entry
         </button>
       </form>
     </div>

@@ -3,76 +3,106 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { formatMoney } from '../utils/helpers';
-import { Wallet, TrendingUp, Coins, Plus, ChevronRight, PieChart } from 'lucide-react';
+import { Wallet, TrendingUp, Coins, Plus, Scale, Tag } from 'lucide-react';
 
 export default function Assets() {
   const navigate = useNavigate();
-  const { wealth, fetchAssets, isAED, fxRate, getGlobalNetWorth } = useAppStore();
+  const { wealth, fetchAssets, isAED, fxRate, getGlobalNetWorth, metalRates } = useAppStore();
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
   const netWorth = getGlobalNetWorth();
 
-  // Helper to group assets by category
   const categories = [
     { id: 'liquid', name: 'Cash & Bank', icon: Wallet, color: 'text-emerald-400' },
     { id: 'market', name: 'Market Investments', icon: TrendingUp, color: 'text-indigo-400' },
-    { id: 'commodity', name: 'Gold & Silver', icon: Coins, color: 'text-amber-400' }
+    { id: 'commodity', name: 'Metal / Commodities', icon: Coins, color: 'text-amber-400' }
   ];
+
+  // Helper to calculate individual asset value for display
+  const getAssetDisplayValue = (asset) => {
+    if (asset.category === 'commodity') {
+      const isGold = asset.metalType === 'gold';
+      const baseRate = isGold ? (isAED ? metalRates.gold_aed : metalRates.gold_inr) : (isAED ? metalRates.silver_aed : metalRates.silver_inr);
+      const purityFactor = isGold ? (parseInt(asset.purity) / 24) : (asset.purity === '925' ? 0.925 : 1);
+      return (Number(asset.grams) || 0) * baseRate * purityFactor;
+    }
+    if (asset.category === 'market') {
+      return (Number(asset.quantity) || 0) * (Number(asset.currentPrice) || 0);
+    }
+    return Number(asset.value) || 0;
+  };
 
   return (
     <div className="p-5 space-y-6 pb-28 min-h-screen bg-neutral-950">
       
       {/* HEADER */}
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-white tracking-tight">Portfolio</h1>
-        <button onClick={() => navigate('/add-asset')} className="bg-indigo-600 p-2.5 rounded-full text-white shadow-lg">
+        <h1 className="text-xl font-black text-white uppercase tracking-widest">Global Portfolio</h1>
+        <button onClick={() => navigate('/add-asset')} className="bg-indigo-600 p-3 rounded-2xl text-white shadow-lg shadow-indigo-950/40 active:scale-90 transition-all">
           <Plus size={20} />
         </button>
       </div>
 
-      {/* NET WORTH DISPLAY */}
-      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 relative overflow-hidden shadow-2xl">
-        <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/10 blur-3xl rounded-full"></div>
-        <p className="text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1">Total Net Worth</p>
-        <h2 className={`text-4xl font-black tracking-tighter ${netWorth >= 0 ? 'text-white' : 'text-rose-500'}`}>
-          {formatMoney(netWorth, isAED, fxRate, 'AED')}
+      {/* TOTAL NET WORTH */}
+      <div className={`border rounded-[2.5rem] p-7 relative overflow-hidden transition-colors duration-500 ${netWorth < 0 ? 'bg-rose-500/10 border-rose-500/20' : 'bg-neutral-900 border-neutral-800'}`}>
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full"></div>
+        <p className="text-[10px] text-neutral-500 uppercase font-black tracking-[0.2em] mb-2">Aggregate Net Worth</p>
+        <h2 className={`text-4xl font-black tracking-tighter ${netWorth < 0 ? 'text-rose-500' : 'text-white'}`}>
+          {formatMoney(netWorth, isAED, fxRate, isAED ? 'AED' : 'INR')}
         </h2>
       </div>
 
       {/* CATEGORIES LIST */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         {categories.map((cat) => {
           const catAssets = wealth.filter(a => a.category === cat.id);
-          const totalVal = catAssets.reduce((acc, a) => acc + (a.currency === 'INR' ? a.value / fxRate : a.value), 0);
+          if (catAssets.length === 0) return null;
 
           return (
-            <div key={cat.id} className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-4 space-y-4">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg bg-neutral-800 ${cat.color}`}><cat.icon size={18} /></div>
-                  <span className="text-sm font-bold text-white">{cat.name}</span>
-                </div>
-                <span className="text-xs font-bold text-neutral-400">
-                  {formatMoney(totalVal, isAED, fxRate, 'AED')}
-                </span>
+            <div key={cat.id} className="space-y-3">
+              <div className="flex items-center gap-2 px-1">
+                <cat.icon size={14} className={cat.color} />
+                <h3 className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">{cat.name}</h3>
               </div>
 
-              {/* Individual Asset Rows */}
-              <div className="space-y-2">
-                {catAssets.map(asset => (
-                  <div key={asset.id} className="flex justify-between items-center bg-neutral-900 p-3 rounded-xl border border-neutral-800/50">
-                    <div>
-                      <p className="text-xs font-bold text-neutral-200">{asset.name}</p>
-                      <p className="text-[9px] text-neutral-500 uppercase">{asset.institution || 'Personal'}</p>
+              <div className="space-y-3">
+                {catAssets.map(asset => {
+                  const val = getAssetDisplayValue(asset);
+                  
+                  return (
+                    <div key={asset.id} className="bg-neutral-900/50 border border-neutral-800/60 rounded-3xl p-5 flex justify-between items-center group active:bg-neutral-900 transition-all">
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold text-white">{asset.name}</p>
+                        
+                        {/* CONDITIONAL DETAILS FOR METALS */}
+                        {asset.category === 'commodity' ? (
+                          <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-1 text-[10px] font-black text-amber-500/80 uppercase">
+                              <Scale size={10} /> {asset.grams}g
+                            </span>
+                            <span className="flex items-center gap-1 text-[10px] font-black text-neutral-500 uppercase bg-neutral-800 px-2 py-0.5 rounded-md">
+                              <Tag size={10} /> {asset.purity}
+                            </span>
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-neutral-600 font-bold uppercase tracking-tighter">
+                            {asset.category === 'market' ? `${asset.quantity} Units` : 'Liquid Asset'}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="text-right">
+                        <p className="text-sm font-black text-white">
+                          {formatMoney(val, isAED, fxRate, asset.category === 'commodity' ? (isAED ? 'AED' : 'INR') : asset.currency)}
+                        </p>
+                        <p className="text-[9px] text-neutral-600 font-bold uppercase mt-1">
+                          Current Valuation
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs font-bold text-white">
-                        {formatMoney(asset.value, asset.currency === 'AED', fxRate, asset.currency)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
