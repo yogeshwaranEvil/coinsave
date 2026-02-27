@@ -354,10 +354,25 @@ export const useAppStore = create((set, get) => ({
   ,
   metalRates: { gold_aed: 620, silver_aed: 12, gold_inr: 16200, silver_inr: 300 },
 
-  fetchMetalRates: async () => {
-    const rates = await api.getLiveMetalRates();
-    if (rates) set({ metalRates: rates });
-  },
+  // src/store/useAppStore.js snippet
+
+fetchMetalRates: async () => {
+  const { metalRates } = get();
+  
+  // Only fetch if data is older than 60 minutes to avoid 429 errors
+  const oneHour = 60 * 60 * 1000;
+  const isFresh = metalRates.lastUpdated && (new Date() - new Date(metalRates.lastUpdated) < oneHour);
+  
+  if (isFresh) {
+    console.log("Using cached metal rates to prevent rate limiting.");
+    return;
+  }
+
+  const rates = await api.getLiveMetalRates();
+  if (rates) {
+    set({ metalRates: rates });
+  }
+},
   // ... existing state ...
   pin: localStorage.getItem('coinsave_pin') || null,
   isLocked: !!localStorage.getItem('coinsave_pin'), // Auto-lock if PIN exists
