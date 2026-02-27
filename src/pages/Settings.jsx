@@ -1,119 +1,54 @@
 // src/pages/Settings.jsx
-import { useState } from 'react';
-import { Settings as SettingsIcon, Shield, Download, RefreshCw, Moon, Database, ChevronRight } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { Shield, ShieldOff, ChevronRight, Bell, Smartphone } from 'lucide-react';
 
 export default function Settings() {
-  const { isAED, toggleCurrency } = useAppStore();
-  const [autoFx, setAutoFx] = useState(true);
-  const [biometrics, setBiometrics] = useState(true);
+  const { pin, setPin, removePin } = useAppStore();
 
-  // Toggle switch component for reuse
-  const Toggle = ({ enabled, onToggle }) => (
-    <div 
-      onClick={onToggle}
-      className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${enabled ? 'bg-emerald-500' : 'bg-neutral-700'}`}
-    >
-      <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enabled ? 'translate-x-6' : 'translate-x-0'}`} />
-    </div>
-  );
+  const handleTogglePin = () => {
+    if (pin) {
+      if (window.confirm("Remove PIN protection?")) removePin();
+    } else {
+      const newPin = prompt("Enter a new 4-digit PIN:");
+      if (newPin && newPin.length === 4) {
+        setPin(newPin);
+      } else {
+        alert("PIN must be exactly 4 digits.");
+      }
+    }
+  };
 
   return (
-    <div className="p-5 space-y-6 animate-in fade-in duration-300 pb-24">
-      <h1 className="text-xl font-bold text-white flex items-center gap-2">
-        <SettingsIcon className="text-neutral-400" /> Settings
-      </h1>
+    <div className="p-6 space-y-8 bg-neutral-950 min-h-screen">
+      <h1 className="text-2xl font-black text-white tracking-tight">Settings</h1>
 
-      {/* PREFERENCES */}
-      <div className="space-y-2">
-        <h2 className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider pl-2">Preferences</h2>
-        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden">
-          
-          <div className="flex justify-between items-center p-4 border-b border-neutral-800">
-            <div className="flex items-center gap-3">
-              <RefreshCw size={18} className="text-blue-400" />
-              <div>
-                <div className="text-sm font-semibold text-white">Default Base Currency</div>
-                <div className="text-[10px] text-neutral-500">View app in AED or INR on launch</div>
-              </div>
+      <div className="space-y-4">
+        <h2 className="text-[10px] font-black text-neutral-500 uppercase tracking-widest px-1">Security</h2>
+        
+        <button 
+          onClick={handleTogglePin}
+          className="w-full bg-neutral-900 border border-neutral-800 rounded-3xl p-5 flex items-center justify-between group active:bg-neutral-800"
+        >
+          <div className="flex items-center gap-4">
+            <div className={`p-2.5 rounded-xl ${pin ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+              {pin ? <Shield size={20} /> : <ShieldOff size={20} />}
             </div>
-            <button 
-              onClick={toggleCurrency}
-              className="bg-neutral-800 px-3 py-1 rounded-lg text-xs font-bold text-neutral-300 transition-colors"
-            >
-              {isAED ? 'AED' : 'INR'}
-            </button>
-          </div>
-
-          <div className="flex justify-between items-center p-4 border-b border-neutral-800">
-            <div className="flex items-center gap-3">
-              <Moon size={18} className="text-indigo-400" />
-              <div>
-                <div className="text-sm font-semibold text-white">Dark Mode</div>
-                <div className="text-[10px] text-neutral-500">Forced for optimal viewing</div>
-              </div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-white">PIN Lock</p>
+              <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-tighter">
+                {pin ? 'App is protected' : 'Security disabled'}
+              </p>
             </div>
-            <Toggle enabled={true} onToggle={() => {}} />
           </div>
-
-          <div className="flex justify-between items-center p-4">
-            <div className="flex items-center gap-3">
-              <RefreshCw size={18} className="text-yellow-500" />
-              <div>
-                <div className="text-sm font-semibold text-white">Auto FX Rate Update</div>
-                <div className="text-[10px] text-neutral-500">Fetch daily AED-INR exchange rates</div>
-              </div>
-            </div>
-            <Toggle enabled={autoFx} onToggle={() => setAutoFx(!autoFx)} />
+          <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase ${pin ? 'bg-emerald-500 text-neutral-950' : 'bg-rose-500 text-white'}`}>
+            {pin ? 'Active' : 'Enable'}
           </div>
-
-        </div>
+        </button>
       </div>
 
-      {/* SECURITY & DATA */}
-      <div className="space-y-2">
-        <h2 className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider pl-2">Security & Data</h2>
-        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden">
-          
-          <div className="flex justify-between items-center p-4 border-b border-neutral-800">
-            <div className="flex items-center gap-3">
-              <Shield size={18} className="text-emerald-400" />
-              <div>
-                <div className="text-sm font-semibold text-white">Require PIN / Biometrics</div>
-                <div className="text-[10px] text-neutral-500">Ask for PIN on app launch</div>
-              </div>
-            </div>
-            <Toggle enabled={biometrics} onToggle={() => setBiometrics(!biometrics)} />
-          </div>
-
-          <div className="flex justify-between items-center p-4 border-b border-neutral-800 cursor-pointer hover:bg-neutral-800/50 transition-colors">
-            <div className="flex items-center gap-3">
-              <Download size={18} className="text-white" />
-              <div>
-                <div className="text-sm font-semibold text-white">Export to CSV</div>
-                <div className="text-[10px] text-neutral-500">Download all transaction history</div>
-              </div>
-            </div>
-            <ChevronRight size={16} className="text-neutral-500" />
-          </div>
-
-          <div className="flex justify-between items-center p-4 cursor-pointer hover:bg-neutral-800/50 transition-colors">
-            <div className="flex items-center gap-3">
-              <Database size={18} className="text-rose-400" />
-              <div>
-                <div className="text-sm font-semibold text-rose-400">Backup / Restore</div>
-                <div className="text-[10px] text-neutral-500">Manual database sync</div>
-              </div>
-            </div>
-            <ChevronRight size={16} className="text-neutral-500" />
-          </div>
-
-        </div>
-      </div>
-
-      <div className="text-center text-[10px] text-neutral-600 pt-4">
-        Cross-Border Tracker v1.0.0
-      </div>
+      <p className="text-[10px] text-neutral-600 font-bold uppercase text-center mt-20 tracking-widest">
+        CoinSave v2.0.1 <br/> Personalized for Peter
+      </p>
     </div>
   );
 }

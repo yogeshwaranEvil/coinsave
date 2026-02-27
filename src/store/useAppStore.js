@@ -358,6 +358,21 @@ export const useAppStore = create((set, get) => ({
     const rates = await api.getLiveMetalRates();
     if (rates) set({ metalRates: rates });
   },
+  // ... existing state ...
+  pin: localStorage.getItem('coinsave_pin') || null,
+  isLocked: !!localStorage.getItem('coinsave_pin'), // Auto-lock if PIN exists
 
+  setPin: (newPin) => {
+    localStorage.setItem('coinsave_pin', newPin);
+    set({ pin: newPin, isLocked: false });
+  },
+
+  removePin: () => {
+    localStorage.removeItem('coinsave_pin');
+    set({ pin: null, isLocked: false });
+  },
+
+  unlock: () => set({ isLocked: false }),
+  lock: () => set({ isLocked: true }),
   
 }));  
