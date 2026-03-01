@@ -1,135 +1,197 @@
-// src/pages/AddExpense.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Minus } from 'lucide-react';
-import { api } from '../services/api';
+import { useAppStore } from '../store/useAppStore';
+import { 
+  ArrowLeft, Save, CreditCard, Wallet, 
+  Tag, Calendar, FileText, ChevronDown 
+} from 'lucide-react';
 
 export default function AddExpense() {
   const navigate = useNavigate();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Form State
-  const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('AED');
-  const [category, setCategory] = useState('Food');
-  const [notes, setNotes] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD format
+  const { addTransaction, cards, fetchCards, isAED } = useAppStore();
+
+  const [formData, setFormData] = useState({
+    type: 'expense',
+    amount: '',
+    currency: isAED ? 'AED' : 'INR',
+    category: 'Shopping',
+    date: new Date().toISOString().split('T')[0],
+    paymentMethod: 'cash', // 'cash' or 'credit_card'
+    cardId: '',            // Linked credit card ID
+    notes: ''
+  });
+
+  useEffect(() => {
+    fetchCards();
+  }, [fetchCards]);
+
+  const categories = [
+    'Shopping', 'Food', 'Transport', 'Bills', 
+    'Health', 'Entertainment', 'Education', 'Other'
+  ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!amount || !category) return;
     
-    setIsSubmitting(true);
-    try {
-      await api.createTransaction({
-        type: 'expense',
-        amount: parseFloat(amount),
-        currency,
-        category,
-        notes,
-        date: new Date(date).toISOString(),
-      });
-      // Success! Go back to Dashboard
-      navigate('/');
-    } catch (error) {
-      console.error(error);
-      alert("Failed to save expense");
-      setIsSubmitting(false);
+    // Safety check: If credit card is selected, a card must be chosen
+    if (formData.paymentMethod === 'credit_card' && !formData.cardId) {
+      alert("Please select a credit card for this expense.");
+      return;
     }
+
+    await addTransaction(formData);
+    navigate('/transactions');
   };
 
   return (
-    <div className="min-h-screen bg-neutral-950 flex flex-col animate-in slide-in-from-bottom-4 duration-300">
-      
+    <div className="min-h-screen bg-neutral-950 p-5 pb-24">
       {/* HEADER */}
-      <div className="px-5 pt-8 pb-4 flex items-center justify-between border-b border-neutral-900">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-neutral-400 hover:text-white transition-colors">
-          <ArrowLeft size={24} />
+      <div className="flex items-center justify-between mb-8">
+        <button onClick={() => navigate(-1)} className="w-10 h-10 bg-neutral-900 border border-neutral-800 rounded-full flex items-center justify-center text-neutral-400">
+          <ArrowLeft size={20} />
         </button>
-        <h1 className="text-lg font-bold text-white flex items-center gap-2">
-          <Minus size={18} className="text-rose-500" /> Add Expense
-        </h1>
-        <div className="w-8"></div> {/* Spacer for center alignment */}
+        <h1 className="text-[10px] font-black text-white uppercase tracking-[0.3em]">Record Expense</h1>
+        <div className="w-10"></div>
       </div>
 
-      {/* FORM */}
-      <form onSubmit={handleSubmit} className="p-5 space-y-6 flex-1 flex flex-col">
+      <form onSubmit={handleSubmit} className="space-y-6">
         
-        {/* BIG AMOUNT INPUT */}
-        <div className="flex flex-col items-center justify-center py-6">
-          <div className="flex items-center gap-3 bg-neutral-900 p-2 rounded-2xl border border-neutral-800 w-full max-w-xs">
-            {/* Currency Toggle inside the input */}
-            <button 
-              type="button"
-              onClick={() => setCurrency(c => c === 'AED' ? 'INR' : 'AED')}
-              className="bg-neutral-800 px-4 py-3 rounded-xl text-sm font-bold text-rose-400 active:scale-95 transition-transform"
-            >
-              {currency} ⇄
-            </button>
+        {/* AMOUNT INPUT */}
+        <div className="text-center space-y-2">
+          <p className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Amount Spent</p>
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-xl font-black text-indigo-500">{formData.currency}</span>
             <input 
-              type="number" 
-              step="0.01"
-              required
+              type="number" required step="0.01"
+              value={formData.amount}
+              onChange={(e) => setFormData({...formData, amount: e.target.value})}
+              placeholder="0.00"
+              className="bg-transparent text-5xl font-black text-white outline-none w-48 text-center placeholder:text-neutral-900"
               autoFocus
-              placeholder="0.00" 
-              value={amount} 
-              onChange={(e) => setAmount(e.target.value)}
-              className="bg-transparent text-3xl font-bold text-white w-full outline-none placeholder:text-neutral-700"
             />
           </div>
         </div>
 
-        {/* DETAILS */}
-        <div className="space-y-4">
-          <div>
-            <label className="text-[10px] text-neutral-500 uppercase tracking-wide ml-1">Category</label>
-            <select 
-              value={category} 
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full mt-1 bg-neutral-900 border border-neutral-800 rounded-xl p-4 text-white outline-none appearance-none"
+        {/* PAYMENT METHOD TOGGLE */}
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-neutral-500 uppercase ml-1 tracking-widest">Payment Source</label>
+          <div className="flex bg-neutral-900 p-1.5 rounded-2xl border border-neutral-800">
+            <button
+              type="button"
+              onClick={() => setFormData({...formData, paymentMethod: 'cash', cardId: ''})}
+              className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase transition-all ${
+                formData.paymentMethod === 'cash' ? 'bg-neutral-800 text-white shadow-lg' : 'text-neutral-600'
+              }`}
             >
-              <option value="Food">Food & Dining</option>
-              <option value="Transport">Transport (Petrol/Nol)</option>
-              <option value="Shopping">Shopping</option>
-              <option value="Bills">Bills & Utilities</option>
-              <option value="Rent">Rent</option>
-              <option value="Other">Other</option>
-            </select>
+              <Wallet size={14} /> Cash / Debit
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormData({...formData, paymentMethod: 'credit_card'})}
+              className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase transition-all ${
+                formData.paymentMethod === 'credit_card' ? 'bg-amber-500 text-neutral-950 shadow-lg' : 'text-neutral-600'
+              }`}
+            >
+              <CreditCard size={14} /> Credit Card
+            </button>
           </div>
+        </div>
 
-          <div>
-            <label className="text-[10px] text-neutral-500 uppercase tracking-wide ml-1">Date</label>
-            <input 
-              type="date" 
-              required
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full mt-1 bg-neutral-900 border border-neutral-800 rounded-xl p-4 text-white outline-none"
-            />
+        {/* DYNAMIC CARD SELECTION */}
+        {formData.paymentMethod === 'credit_card' && (
+          <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+            <label className="text-[10px] font-black text-amber-500 uppercase ml-1 tracking-widest">Select Card</label>
+            <div className="relative">
+              <select 
+                required
+                value={formData.cardId}
+                onChange={(e) => setFormData({...formData, cardId: e.target.value})}
+                className="w-full bg-neutral-900 border border-amber-500/20 rounded-2xl p-5 text-white outline-none appearance-none font-bold"
+              >
+                <option value="" disabled>Choose card...</option>
+                {cards.map(card => (
+                  <option key={card.id} value={card.id}>
+                    {card.bankName} (**** {card.lastFour}) - {card.currency}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-5 top-5 text-neutral-600 pointer-events-none" size={18} />
+            </div>
           </div>
+        )}
 
-          <div>
-            <label className="text-[10px] text-neutral-500 uppercase tracking-wide ml-1">Notes (Optional)</label>
-            <input 
-              type="text" 
-              placeholder="e.g., Karak tea at Al Maya" 
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full mt-1 bg-neutral-900 border border-neutral-800 rounded-xl p-4 text-white outline-none placeholder:text-neutral-600"
+        {/* CATEGORY & DATE ROW */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-neutral-500 uppercase ml-1 tracking-widest">Category</label>
+            <div className="relative">
+              <select 
+                value={formData.category}
+                onChange={(e) => setFormData({...formData, category: e.target.value})}
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-white outline-none appearance-none font-bold"
+              >
+                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+              <Tag className="absolute right-4 top-4 text-neutral-700 pointer-events-none" size={14} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-neutral-500 uppercase ml-1 tracking-widest">Date</label>
+            <div className="relative">
+              <input 
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({...formData, date: e.target.value})}
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-white outline-none font-bold"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* CURRENCY TOGGLE (ONLY FOR CASH) */}
+        {formData.paymentMethod === 'cash' && (
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-neutral-500 uppercase ml-1 tracking-widest">Currency</label>
+            <div className="flex bg-neutral-900 p-1.5 rounded-2xl border border-neutral-800">
+              <button
+                type="button"
+                onClick={() => setFormData({...formData, currency: 'AED'})}
+                className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${formData.currency === 'AED' ? 'bg-indigo-600 text-white' : 'text-neutral-600'}`}
+              >
+                AED
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({...formData, currency: 'INR'})}
+                className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${formData.currency === 'INR' ? 'bg-indigo-600 text-white' : 'text-neutral-600'}`}
+              >
+                INR
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* NOTES */}
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-neutral-500 uppercase ml-1 tracking-widest">Notes (Optional)</label>
+          <div className="relative">
+            <FileText className="absolute left-5 top-5 text-neutral-600" size={18} />
+            <textarea 
+              value={formData.notes}
+              onChange={(e) => setFormData({...formData, notes: e.target.value})}
+              placeholder="What was this for?"
+              className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl py-5 pl-14 pr-5 text-white outline-none font-medium h-24"
             />
           </div>
         </div>
 
-        {/* SUBMIT BUTTON */}
-        <div className="mt-auto pt-8 pb-4">
-          <button 
-            type="submit" 
-            disabled={isSubmitting}
-            className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-4 rounded-2xl shadow-[0_0_20px_rgba(225,29,72,0.3)] transition-all disabled:opacity-50"
-          >
-            {isSubmitting ? 'Saving...' : 'Save Expense'}
-          </button>
-        </div>
+        {/* SUBMIT */}
+        <button 
+          type="submit" 
+          className="w-full bg-indigo-600 py-5 rounded-[2rem] font-black text-white shadow-xl shadow-indigo-950/40 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] text-[11px]"
+        >
+          <Save size={18} /> Confirm Expense
+        </button>
       </form>
     </div>
   );

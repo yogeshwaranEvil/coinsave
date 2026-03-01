@@ -32,6 +32,9 @@ import LoanRepayment from './pages/LoanRepayment';
 // Assets & Wealth
 import Assets from './pages/Assets';
 import AddAsset from './pages/AddAsset';
+import ManageCards from './pages/ManageCards';
+import AddCard from './pages/AddCard';
+import CardDetails from './pages/CardDetails';
 
 function App() {
   const { isLocked, pin } = useAppStore();
@@ -60,13 +63,14 @@ function App() {
               <Route path="/edit-transaction/:id" element={<EditTransaction />} />
               <Route path="/upcoming-bills" element={<UpcomingBills />} />
               <Route path="/add-upcoming" element={<AddUpcoming />} />
-              
+              <Route path="/manage-cards" element={<ManageCards />} />
+              <Route path="/add-card" element={ <AddCard />} />
               {/* 🌍 Cross-Border (Remittance) */}
               <Route path="/remittance" element={<Remittance />} />
               <Route path="/add-remittance" element={<AddRemittance />} />
               <Route path="/remittance/:id" element={<RemittanceDetail />} />
               <Route path="/edit-remittance/:id" element={<EditRemittance />} />
-
+              <Route path="/card-details/:id" element={<CardDetails />} />
               {/* 🏦 Loans & Debts */}
               <Route path="/loans" element={<Loans />} />
               <Route path="/add-loan" element={<AddLoan />} />

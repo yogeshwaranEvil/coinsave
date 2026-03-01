@@ -26,7 +26,11 @@ export const useAppStore = create((set, get) => ({
   wealth: [],
   upcomingBills: [],
   loans: [],
+  cards: [],
   isLoading: false,
+  metalRates: { gold_aed: 620, silver_aed: 12, gold_inr: 16200, silver_inr: 300, lastUpdated: null },
+  pin: localStorage.getItem('coinsave_pin') || null,
+  isLocked: !!localStorage.getItem('coinsave_pin'),
 
   // --- TRANSACTION ACTIONS ---
   fetchTransactions: async () => {
@@ -38,9 +42,7 @@ export const useAppStore = create((set, get) => ({
 
   addTransaction: async (transactionData) => {
     const newTx = await api.createTransaction(transactionData);
-    set((state) => ({ 
-      transactions: [newTx, ...state.transactions] 
-    }));
+    set((state) => ({ transactions: [newTx, ...state.transactions] }));
     return newTx;
   },
 
@@ -58,6 +60,78 @@ export const useAppStore = create((set, get) => ({
     set((state) => ({
       transactions: state.transactions.filter(tx => tx.id !== id && tx._id !== id)
     }));
+  },
+
+  // --- CREDIT CARD ACTIONS ---
+  fetchCards: async () => {
+    const data = await api.getCards();
+    set({ cards: data });
+  },
+
+  addCard: async (cardData) => {
+    const newCard = await api.createCard(cardData);
+    set((state) => ({ cards: [...state.cards, newCard] }));
+    return newCard;
+  },
+
+  deleteCard: async (id) => {
+    const { transactions, deleteTransaction } = get();
+    const linkedTransactions = transactions.filter(tx => String(tx.cardId) === String(id));
+    for (const tx of linkedTransactions) {
+      await deleteTransaction(tx.id || tx._id);
+    }
+    await api.deleteCard(id);
+    set((state) => ({ cards: state.cards.filter(c => c.id !== id && c._id !== id) }));
+  },
+
+  // --- 🔴 FIXED: CARD OUTSTANDING MATH ---
+  getCardOutstanding: (cardId) => {
+    const { transactions } = get();
+    return transactions
+      .filter(tx => 
+        String(tx.cardId) === String(cardId) && 
+        tx.paymentMethod === 'credit_card' // MUST ONLY COUNT CARD SIDE
+      )
+      .reduce((acc, tx) => {
+        const amt = Number(tx.amount) || 0;
+        // Expenses add to debt, Income (Repayments) subtract from debt
+        return tx.type === 'expense' ? acc + amt : acc - amt;
+      }, 0);
+  },
+
+  payCardBill: async (cardId, amount, note = '') => {
+    const { cards, addTransaction } = get();
+    const card = cards.find(c => c.id === cardId || c._id === cardId);
+    if (!card) return;
+
+    const timestamp = Date.now();
+
+    // 1. CASH OUTFLOW
+    await addTransaction({
+      id: `pay-out-${cardId}-${timestamp}`,
+      type: 'expense',
+      paymentMethod: 'cash',
+      cardId: cardId, 
+      amount: amount,
+      currency: card.currency,
+      category: 'Bill Payment',
+      date: new Date().toISOString(),
+      notes: `Bank Transfer to ${card.bankName}. ${note}`
+    });
+
+    // 2. CREDIT INFLOW
+    await addTransaction({
+      id: `pay-in-${cardId}-${timestamp}`,
+      type: 'income', 
+      paymentMethod: 'credit_card',
+      cardId: cardId,
+      amount: amount,
+      currency: card.currency,
+      category: 'Card Repayment',
+      isInternalTransfer: true, 
+      date: new Date().toISOString(),
+      notes: `Settlement for ****${card.lastFour}`
+    });
   },
 
   // --- UPCOMING EXPENSES ACTIONS ---
@@ -104,7 +178,7 @@ export const useAppStore = create((set, get) => ({
     await deleteUpcoming(bill.id || bill._id);
   },
 
-  // --- REMITTANCE ACTIONS (SYNCED WITH TRANSACTIONS) ---
+  // --- REMITTANCE ACTIONS ---
   fetchRemittances: async () => {
     const data = await api.getRemittances();
     set({ remittances: data.sort((a, b) => new Date(b.date) - new Date(a.date)) });
@@ -113,7 +187,6 @@ export const useAppStore = create((set, get) => ({
   addRemittance: async (remitData) => {
     const { addTransaction } = get();
     const newRemit = await api.createRemittance(remitData);
-    
     await addTransaction({
       id: `remit-${newRemit.id}`, 
       type: 'expense',
@@ -123,22 +196,18 @@ export const useAppStore = create((set, get) => ({
       date: newRemit.date,
       notes: `Sent to ${newRemit.destination_account}`
     });
-
     set((state) => ({ remittances: [newRemit, ...state.remittances] }));
     return newRemit;
   },
 
   updateRemittance: async (id, updatedData) => {
-    const { transactions, updateTransaction, addTransaction } = get();
+    const { transactions, updateTransaction } = get();
     const updatedRemit = await api.updateRemittance(id, updatedData);
-    
     set((state) => ({
       remittances: state.remittances.map(r => (r.id === id || r._id === id) ? updatedRemit : r)
     }));
-
     const twinId = `remit-${id}`;
     const twinExists = transactions.some(tx => tx.id === twinId || tx._id === twinId);
-
     const twinPayload = {
       amount: updatedRemit.aed_sent + updatedRemit.transfer_fee_aed,
       date: updatedRemit.date,
@@ -147,24 +216,15 @@ export const useAppStore = create((set, get) => ({
       type: 'expense',
       currency: 'AED'
     };
-
     if (twinExists) {
       const updatedTwin = await api.updateTransaction(twinId, twinPayload);
       set((state) => ({
-        transactions: state.transactions.map(tx => 
-          (tx.id === twinId || tx._id === twinId) ? updatedTwin : tx
-        )
+        transactions: state.transactions.map(tx => (tx.id === twinId || tx._id === twinId) ? updatedTwin : tx)
       }));
     } else {
-      const newTwin = await api.createTransaction({
-        ...twinPayload,
-        id: twinId 
-      });
-      set((state) => ({
-        transactions: [newTwin, ...state.transactions]
-      }));
+      const newTwin = await api.createTransaction({ ...twinPayload, id: twinId });
+      set((state) => ({ transactions: [newTwin, ...state.transactions] }));
     }
-
     return updatedRemit;
   },
 
@@ -172,7 +232,6 @@ export const useAppStore = create((set, get) => ({
     const { deleteTransaction } = get();
     await api.deleteRemittance(id);
     await deleteTransaction(`remit-${id}`);
-    
     set((state) => ({
       remittances: state.remittances.filter(r => r.id !== id && r._id !== id)
     }));
@@ -201,88 +260,22 @@ export const useAppStore = create((set, get) => ({
     }));
   },
 
-// src/store/useAppStore.js
-
   deleteLoan: async (id) => {
     const { transactions, deleteTransaction } = get();
-    
-    // 1. Delete the actual Loan from Local Storage/API
     await api.deleteLoan(id);
-    
-    // 2. FIND & DELETE LINKED REPAYMENTS
-    // We look for transactions where the notes include the loan name or repayments
-    // Or if we specifically tagged them (best practice)
     const linkedRepayments = transactions.filter(tx => 
       tx.category === 'Loan Repayment' && 
       (tx.notes.includes(id) || tx.id.startsWith(`repay-${id}`))
     );
-
-    // Loop through and delete each linked transaction
     for (const repayTx of linkedRepayments) {
       await deleteTransaction(repayTx.id || repayTx._id);
     }
-
-    // 3. Update local state
     set((state) => ({
       loans: state.loans.filter(l => l.id !== id && l._id !== id)
     }));
   },
 
-  // Add/Update these in src/store/useAppStore.js
-// src/store/useAppStore.js
-
-  payLoan: async (loanId, paymentAmount, note = '') => {
-    const { loans, updateLoan, addTransaction } = get();
-    const loan = loans.find(l => l.id === loanId || l._id === loanId);
-
-    if (!loan) return;
-
-    const newPrincipal = Math.max(0, loan.principal - paymentAmount);
-
-    // We add a specific ID prefix: repay-[loanId]-[timestamp]
-    const repaymentId = `repay-${loanId}-${Date.now()}`;
-
-    await addTransaction({
-      id: repaymentId, // Tracking ID
-      type: 'expense',
-      amount: paymentAmount,
-      currency: loan.currency,
-      category: 'Loan Repayment',
-      date: new Date().toISOString(),
-      notes: `${note || `Repayment for ${loan.name}`}`
-    });
-
-    await updateLoan(loanId, { 
-      principal: newPrincipal,
-      status: newPrincipal === 0 ? 'closed' : 'active'
-    });
-  },
-
-  // --- DYNAMIC INTEREST CALCULATION ---
-  getLiveLoanBalance: (loan) => {
-    const now = new Date();
-    // Use the date the loan was added or updated to track interest accrual
-    const startDate = new Date(loan.updatedAt || loan.createdAt || loan.date);
-    
-    // Total days elapsed since last update/creation
-    const diffTime = Math.abs(now - startDate);
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
-    // (Monthly Int / 30) = Daily Rate
-    const dailyRate = (Number(loan.interestPerMonth) / 100) / 30;
-    const accruedInterest = Number(loan.principal) * dailyRate * diffDays;
-    
-    return {
-      currentPrincipal: Number(loan.principal),
-      accruedInterest: accruedInterest,
-      totalOwed: Number(loan.principal) + accruedInterest,
-      dailyCost: Number(loan.principal) * dailyRate
-    };
-  },
-
-  wealth: [], // This will hold our Assets
-
-  // --- ASSET ACTIONS ---
+  // --- ASSET & WEALTH ACTIONS ---
   fetchAssets: async () => {
     const data = await api.getAssets();
     set({ wealth: data });
@@ -300,32 +293,33 @@ export const useAppStore = create((set, get) => ({
     }));
   },
 
-  // --- GLOBAL INTELLIGENCE ---
- getGlobalNetWorth: () => {
-    const { wealth, loans, fxRate, metalRates, isAED } = get();
+  fetchMetalRates: async () => {
+    const { metalRates } = get();
+    const oneHour = 60 * 60 * 1000;
+    const isFresh = metalRates.lastUpdated && (new Date() - new Date(metalRates.lastUpdated) < oneHour);
+    if (isFresh) return;
+    const rates = await api.getLiveMetalRates();
+    if (rates) set({ metalRates: rates });
+  },
+
+  // --- 🔴 FIXED: GLOBAL NET WORTH MATH ---
+  getGlobalNetWorth: () => {
+    const { wealth, loans, fxRate, metalRates, isAED, transactions } = get();
     const safeFx = fxRate || 22.85;
-    
-    // Ensure metalRates exists, otherwise use hardcoded fallbacks
     const rates = metalRates || { gold_aed: 310, silver_aed: 3.5, gold_inr: 7200, silver_inr: 95 };
 
     const assetsAED = wealth.reduce((acc, asset) => {
       let assetValueAED = 0;
-
       if (asset.category === 'commodity') {
         const isGold = asset.metalType === 'gold';
-        // Pick base rate (24K Gold or Spot Silver)
         const baseRate = isGold ? rates.gold_aed : rates.silver_aed;
-        
         let purityFactor = 1;
         if (isGold) {
-          // Convert '22K' string to numerical ratio (22/24)
           const caratValue = parseInt(asset.purity) || 24;
           purityFactor = caratValue / 24;
         } else {
-          // Silver purity factor (999 = 1, 925 = 0.925)
           purityFactor = asset.purity === '925' ? 0.925 : 1;
         }
-
         assetValueAED = (Number(asset.grams) || 0) * baseRate * purityFactor;
       } 
       else if (asset.category === 'market') {
@@ -333,50 +327,31 @@ export const useAppStore = create((set, get) => ({
         assetValueAED = asset.currency === 'INR' ? totalVal / safeFx : totalVal;
       } 
       else {
-        // Liquid assets
         const val = Number(asset.value) || Number(asset.totalValue) || 0;
         assetValueAED = asset.currency === 'INR' ? val / safeFx : val;
       }
-
       return acc + assetValueAED;
     }, 0);
 
-    const debtsAED = loans.reduce((acc, loan) => {
+    const loanDebtsAED = loans.reduce((acc, loan) => {
       const loanVal = Number(loan.principal) || 0;
       return acc + (loan.currency === 'INR' ? loanVal / safeFx : loanVal);
     }, 0);
 
-    const finalNetWorthAED = assetsAED - debtsAED;
+    // CRITICAL MATH FIX: Subtract repayments, add expenses
+    const creditDebtsAED = transactions
+      .filter(tx => tx.paymentMethod === 'credit_card')
+      .reduce((acc, tx) => {
+        const amt = Number(tx.amount) || 0;
+        const convertedAmt = tx.currency === 'INR' ? amt / safeFx : amt;
+        return tx.type === 'expense' ? acc + convertedAmt : acc - convertedAmt;
+      }, 0);
 
-    // Return based on user's current toggle (AED or INR)
+    const finalNetWorthAED = assetsAED - loanDebtsAED - creditDebtsAED;
     return isAED ? finalNetWorthAED : finalNetWorthAED * safeFx;
-  }
-  ,
-  metalRates: { gold_aed: 620, silver_aed: 12, gold_inr: 16200, silver_inr: 300 },
+  },
 
-  // src/store/useAppStore.js snippet
-
-fetchMetalRates: async () => {
-  const { metalRates } = get();
-  
-  // Only fetch if data is older than 60 minutes to avoid 429 errors
-  const oneHour = 60 * 60 * 1000;
-  const isFresh = metalRates.lastUpdated && (new Date() - new Date(metalRates.lastUpdated) < oneHour);
-  
-  if (isFresh) {
-    console.log("Using cached metal rates to prevent rate limiting.");
-    return;
-  }
-
-  const rates = await api.getLiveMetalRates();
-  if (rates) {
-    set({ metalRates: rates });
-  }
-},
-  // ... existing state ...
-  pin: localStorage.getItem('coinsave_pin') || null,
-  isLocked: !!localStorage.getItem('coinsave_pin'), // Auto-lock if PIN exists
-
+  // --- SECURITY ---
   setPin: (newPin) => {
     localStorage.setItem('coinsave_pin', newPin);
     set({ pin: newPin, isLocked: false });
@@ -389,5 +364,4 @@ fetchMetalRates: async () => {
 
   unlock: () => set({ isLocked: false }),
   lock: () => set({ isLocked: true }),
-  
-}));  
+}));

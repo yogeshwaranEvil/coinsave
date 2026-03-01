@@ -109,15 +109,17 @@ export default function Settings() {
         
         <div className="grid grid-cols-2 gap-4">
           {/* SECURE EXPORT */}
-          <button 
-            onClick={handleSecureExport}
-            className="bg-neutral-900 border border-neutral-800 rounded-[2rem] p-6 flex flex-col items-center gap-3 active:scale-95 transition-all"
-          >
-            <div className="p-3 bg-indigo-500/10 text-indigo-400 rounded-2xl shadow-inner">
-              <Download size={24} />
-            </div>
-            <span className="text-[10px] font-black text-white uppercase tracking-widest">Backup</span>
-          </button>
+         <button 
+  onClick={async () => {
+    if (verifyIdentity()) {
+       await exportData(); // Now using the async mobile-ready version
+    }
+  }}
+  className="bg-neutral-900 border border-neutral-800 rounded-[2rem] p-6 flex flex-col items-center gap-3 active:scale-95"
+>
+  <Download size={24} className="text-indigo-400" />
+  <span className="text-[10px] font-black text-white uppercase tracking-widest">Backup</span>
+</button>
 
           {/* SECURE IMPORT */}
           <label className="bg-neutral-900 border border-neutral-800 rounded-[2rem] p-6 flex flex-col items-center gap-3 active:scale-95 transition-all cursor-pointer relative">
@@ -140,7 +142,7 @@ export default function Settings() {
         onClick={handleFactoryReset}
         className="w-full bg-rose-500/5 border border-rose-500/10 py-5 rounded-[2rem] flex items-center justify-center gap-3 text-rose-500 text-[10px] font-black uppercase tracking-[0.2em] active:bg-rose-500/10 transition-all"
       >
-        <Trash2 size={16} /> Factory Reset
+        <Trash2 size={16} /> Factory Reset / Wipe data
       </button>
 
       <div className="flex flex-col items-center gap-2 opacity-40">

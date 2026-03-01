@@ -257,5 +257,34 @@ export const api = {
       console.error("Metal API Error:", error);
       return null;
     }
-  }
+  },
+
+  getCards: async () => {
+    const data = localStorage.getItem('coinsave_cards');
+    return data ? JSON.parse(data) : [];
+  },
+
+  createCard: async (cardData) => {
+    const cards = await api.getCards();
+    const newCard = { 
+      ...cardData, 
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString() 
+    };
+    localStorage.setItem('coinsave_cards', JSON.stringify([...cards, newCard]));
+    return newCard;
+  },
+
+  updateCard: async (id, updatedData) => {
+    const cards = await api.getCards();
+    const updatedCards = cards.map(c => c.id === id ? { ...c, ...updatedData } : c);
+    localStorage.setItem('coinsave_cards', JSON.stringify(updatedCards));
+    return updatedCards.find(c => c.id === id);
+  },
+
+  deleteCard: async (id) => {
+    const cards = await api.getCards();
+    const filtered = cards.filter(c => c.id !== id);
+    localStorage.setItem('coinsave_cards', JSON.stringify(filtered));
+  },
 };
