@@ -3,7 +3,7 @@ import { useEffect, useMemo } from 'react';
 import { 
   ArrowDownRight, ArrowUpRight, Send, Zap, 
   Plus, Minus, CalendarClock,
-  TrendingDown, TrendingUp, Coins, CreditCard, AlertCircle
+  TrendingDown, TrendingUp, Coins, CreditCard, AlertCircle, CheckCircle2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
@@ -82,14 +82,13 @@ export default function Dashboard() {
     };
   }, [transactions, fxRate]);
 
-  // --- 🔴 FIXED: CREDIT SUMMARY MATH ---
+  // --- CREDIT SUMMARY MATH ---
   const creditSummary = useMemo(() => {
     const safeFx = fxRate || 22.85;
     const totalOutstandingAED = transactions
       .filter(tx => tx.paymentMethod === 'credit_card')
       .reduce((acc, tx) => {
         const amt = tx.currency === 'INR' ? Number(tx.amount) / safeFx : Number(tx.amount);
-        // CRITICAL: Expenses ADD to debt, Income (Repayments) SUBTRACT from debt
         return tx.type === 'expense' ? acc + amt : acc - amt;
       }, 0);
 
@@ -237,13 +236,65 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* --- RESTORED: UPCOMING BILLS WIDGET --- */}
+      {upcomingBills && upcomingBills.length > 0 && (
+        <div className="space-y-4 pt-2">
+          <div className="flex justify-between items-center px-1">
+            <h2 className="text-[10px] font-black text-neutral-500 uppercase tracking-widest flex items-center gap-2">
+              <CalendarClock size={12} /> Upcoming Bills
+            </h2>
+          </div>
+          
+          <div className="space-y-3">
+            {upcomingBills.slice(0, 3).map(bill => {
+              const billDate = new Date(bill.date);
+              const isLate = billDate < new Date() && !bill.isPaid;
+              
+              return (
+                <div key={bill.id || bill._id} className="bg-neutral-900/40 border border-neutral-800 rounded-3xl p-5 flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-2xl ${isLate ? 'bg-rose-500/10 text-rose-500' : 'bg-indigo-500/10 text-indigo-400'}`}>
+                      <CalendarClock size={20} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-white">{bill.category}</p>
+                      <p className="text-[10px] text-neutral-500 font-bold uppercase mt-0.5 tracking-tighter line-clamp-1">
+                        {billDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {bill.notes || 'Scheduled'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-white">
+                      {formatMoney(bill.amount, bill.currency === 'AED' ? isAED : !isAED, fxRate, bill.currency)}
+                    </p>
+                    <button 
+                      onClick={() => {
+                        if(window.confirm(`Process payment for ${bill.category}?`)) {
+                          markUpcomingAsPaid(bill);
+                        }
+                      }}
+                      className="mt-2 text-[9px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1 ml-auto hover:text-emerald-300 active:scale-95 transition-all"
+                    >
+                      <CheckCircle2 size={12} /> Mark Paid
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* QUICK ACTIONS GRID */}
-      <div className="grid grid-cols-4 gap-4 pb-2">
+      {/* QUICK ACTIONS GRID */}
+      <div className="grid grid-cols-4 gap-y-6 gap-x-4 pb-2">
         {[
           { label: 'Expense', icon: Minus, color: 'text-rose-400', path: '/add-expense' },
           { label: 'Income', icon: Plus, color: 'text-emerald-400', path: '/add-income' },
           { label: 'Cards', icon: CreditCard, color: 'text-amber-400', path: '/manage-cards' },
-          { label: 'Remit', icon: Send, color: 'text-indigo-400', path: '/add-remittance' }
+          { label: 'Remit', icon: Send, color: 'text-indigo-400', path: '/add-remittance' },
+          { label: 'Bills', icon: CalendarClock, color: 'text-sky-400', path: '/upcoming-bills' },
+          { label: 'Wealth', icon: Coins, color: 'text-amber-400', path: '/assets' }
         ].map((action, i) => (
           <button key={i} onClick={() => navigate(action.path)} className="flex flex-col items-center gap-2 group">
             <div className="w-14 h-14 bg-neutral-900 border border-neutral-800 rounded-3xl flex items-center justify-center transition-all group-active:scale-90 group-active:bg-neutral-800 shadow-xl">

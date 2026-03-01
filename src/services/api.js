@@ -227,14 +227,20 @@ export const api = {
     return assets[index];
   },
 
-  deleteAsset: async (id) => {
+ // Add this inside the exported `api` object in src/services/api.js
+// --- ADD THIS TO src/services/api.js ---
+ // Inside src/services/api.js
+  
+ deleteAsset: async (id) => {
     await simulateNetwork();
     const assets = getData(STORAGE_KEYS.WEALTH);
-    const filtered = assets.filter(a => a.id !== id && a._id !== id);
+    
+    // Filter out the asset using strict string comparison
+    const filtered = assets.filter(a => String(a.id) !== String(id) && String(a._id) !== String(id));
+    
+    // Save it back using your custom save function
     saveData(STORAGE_KEYS.WEALTH, filtered);
-    return true;
   },
-
   getLiveMetalRates: async () => {
     const headers = { "x-access-token": GOLD_API_KEY, "Content-Type": "application/json" };
     try {
@@ -287,4 +293,5 @@ export const api = {
     const filtered = cards.filter(c => c.id !== id);
     localStorage.setItem('coinsave_cards', JSON.stringify(filtered));
   },
+ 
 };

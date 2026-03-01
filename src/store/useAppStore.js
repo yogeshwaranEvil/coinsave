@@ -364,4 +364,18 @@ export const useAppStore = create((set, get) => ({
 
   unlock: () => set({ isLocked: false }),
   lock: () => set({ isLocked: true }),
+  // Add this under the --- ASSET & WEALTH ACTIONS --- section in useAppStore.js
+
+  // Add this inside src/store/useAppStore.js under the ASSET actions
+
+  // --- ADD THIS TO src/store/useAppStore.js ---
+// Inside src/store/useAppStore.js
+  
+ deleteAsset: async (id) => {
+    await api.deleteAsset(id);
+    
+    set((state) => ({
+      wealth: state.wealth.filter(a => String(a.id) !== String(id) && String(a._id) !== String(id))
+    }));
+  },
 }));

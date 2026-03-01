@@ -35,6 +35,7 @@ import AddAsset from './pages/AddAsset';
 import ManageCards from './pages/ManageCards';
 import AddCard from './pages/AddCard';
 import CardDetails from './pages/CardDetails';
+import EditAsset from './pages/EditAsset';
 
 function App() {
   const { isLocked, pin } = useAppStore();
@@ -80,7 +81,7 @@ function App() {
               {/* 🪙 Assets & Wealth */}
               <Route path="/assets" element={<Assets />} />
               <Route path="/add-asset" element={<AddAsset />} />
-
+              <Route path="/edit-asset/:id" element={<EditAsset />} />
               {/* ⚙️ Settings */}
               <Route path="/settings" element={<Settings />} />
             </Routes>
