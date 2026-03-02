@@ -1,5 +1,5 @@
 // src/pages/Dashboard.jsx
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { 
   ArrowDownRight, ArrowUpRight, Send, Zap, 
   Plus, Minus, CalendarClock,
@@ -11,6 +11,9 @@ import { formatMoney } from '../utils/helpers';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  
+  // --- NEW STATE FOR TOGGLE ---
+  const [isYearlyView, setIsYearlyView] = useState(false);
   
   const { 
     isAED, 
@@ -41,26 +44,43 @@ export default function Dashboard() {
     fetchCards();
   }, [fetchLiveFxRate, fetchTransactions, fetchUpcoming, fetchLoans, fetchAssets, fetchMetalRates, fetchCards]);
 
-  const { monthlyIncome, monthlyExpense, creditSpending, netSavings, savingsRate } = useMemo(() => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+  // --- 🔴 FIXED: DYNAMIC MONTHLY / YEARLY MATH ---
+  const { periodIncome, periodExpense, periodCreditSpending, periodNetSavings, periodSavingsRate, activePeriodLabel } = useMemo(() => {
+    let targetMonth = new Date().getMonth();
+    let targetYear = new Date().getFullYear();
+
+    // AUTO-DETECT RESTORED DATA
+    if (transactions && transactions.length > 0) {
+      const newestTxDate = new Date(transactions[0].date);
+      if (!isNaN(newestTxDate.getTime())) {
+        targetMonth = newestTxDate.getMonth();
+        targetYear = newestTxDate.getFullYear();
+      }
+    }
 
     let incomeAED = 0;
     let cashExpenseAED = 0; 
     let creditSpendAED = 0; 
 
     transactions.forEach(tx => {
-      if (tx.category === 'Card Repayment' || tx.isInternalTransfer) return;
+      if (!tx || tx.category === 'Card Repayment' || tx.isInternalTransfer) return;
 
       const safeFxRate = fxRate > 0 ? fxRate : 22.85; 
-      const amountInAED = tx.currency === 'INR' ? Number(tx.amount) / safeFxRate : Number(tx.amount);
+      const amountInAED = tx.currency === 'INR' ? (Number(tx.amount) || 0) / safeFxRate : (Number(tx.amount) || 0);
       
-      const txDate = new Date(tx.date);
-      if (txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear) {
-        if (tx.type === 'income') {
+      const txDate = tx.date ? new Date(tx.date) : new Date();
+      if (isNaN(txDate.getTime())) return;
+      
+      // LOGIC SWITCH BASED ON TOGGLE
+      const isMatch = isYearlyView 
+        ? txDate.getFullYear() === targetYear 
+        : (txDate.getMonth() === targetMonth && txDate.getFullYear() === targetYear);
+      
+      if (isMatch) {
+        const txType = String(tx.type).toLowerCase();
+        if (txType === 'income') {
           incomeAED += amountInAED;
-        } else if (tx.type === 'expense') {
+        } else if (txType === 'expense') {
           if (tx.paymentMethod === 'credit_card') {
             creditSpendAED += amountInAED;
           } else {
@@ -72,15 +92,18 @@ export default function Dashboard() {
 
     const net = incomeAED - cashExpenseAED;
     const rate = incomeAED > 0 ? ((net / incomeAED) * 100).toFixed(1) : 0;
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
     return { 
-      monthlyIncome: incomeAED, 
-      monthlyExpense: cashExpenseAED, 
-      creditSpending: creditSpendAED, 
-      netSavings: net, 
-      savingsRate: rate 
+      periodIncome: incomeAED, 
+      periodExpense: cashExpenseAED, 
+      periodCreditSpending: creditSpendAED, 
+      periodNetSavings: net, 
+      periodSavingsRate: rate,
+      // Change label to "2026" or "Mar 2026"
+      activePeriodLabel: isYearlyView ? `${targetYear}` : `${monthNames[targetMonth]} ${targetYear}`
     };
-  }, [transactions, fxRate]);
+  }, [transactions, fxRate, isYearlyView]);
 
   // --- CREDIT SUMMARY MATH ---
   const creditSummary = useMemo(() => {
@@ -189,27 +212,39 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* MONTHLY STATUS CARD */}
+      {/* MONTHLY / YEARLY STATUS CARD */}
       <div className={`relative overflow-hidden rounded-[32px] p-6 transition-all duration-700 border ${
-        netSavings < 0 ? 'bg-rose-500/10 border-rose-500/20' : 'bg-emerald-500/10 border-emerald-500/20'
+        periodNetSavings < 0 ? 'bg-rose-500/10 border-rose-500/20' : 'bg-emerald-500/10 border-emerald-500/20'
       }`}>
         <div className="flex justify-between items-start relative z-10">
           <div>
-            <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${netSavings < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-              {netSavings < 0 ? 'Monthly shortfall' : 'Net Savings'}
+            <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${periodNetSavings < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+              {activePeriodLabel} {periodNetSavings < 0 ? 'Shortfall' : 'Savings'}
             </p>
-            <h2 className="text-3xl font-black text-white">{formatMoney(netSavings, isAED, fxRate, 'AED')}</h2>
+            <h2 className="text-3xl font-black text-white">{formatMoney(periodNetSavings, isAED, fxRate, 'AED')}</h2>
           </div>
-          <div className={`p-3 rounded-2xl ${netSavings < 0 ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-            {netSavings < 0 ? <TrendingDown size={24} /> : <TrendingUp size={24} />}
+          
+          <div className="flex flex-col items-end gap-3">
+            {/* 🔴 NEW TOGGLE BUTTON */}
+            <button 
+              onClick={() => setIsYearlyView(!isYearlyView)}
+              className="flex items-center bg-neutral-950/50 border border-neutral-800/60 rounded-full p-1 shadow-inner active:scale-95 transition-all"
+            >
+              <span className={`px-3 py-1 text-[8px] font-black uppercase tracking-widest rounded-full transition-all duration-300 ${!isYearlyView ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-500'}`}>Mo</span>
+              <span className={`px-3 py-1 text-[8px] font-black uppercase tracking-widest rounded-full transition-all duration-300 ${isYearlyView ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-500'}`}>Yr</span>
+            </button>
+            
+            <div className={`p-2 rounded-xl ${periodNetSavings < 0 ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+              {periodNetSavings < 0 ? <TrendingDown size={18} /> : <TrendingUp size={18} />}
+            </div>
           </div>
         </div>
         <div className="mt-6 flex items-center justify-between relative z-10">
-          <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${netSavings < 0 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-neutral-950'}`}>
-            Efficiency: {savingsRate}%
+          <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${periodNetSavings < 0 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-neutral-950'}`}>
+            Efficiency: {periodSavingsRate}%
           </div>
           <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-tight">
-            {netSavings < 0 ? 'Overspending Detected' : 'Healthy Cash Flow'}
+            {periodNetSavings < 0 ? 'Overspending Detected' : 'Healthy Cash Flow'}
           </p>
         </div>
       </div>
@@ -220,23 +255,23 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 text-emerald-500 mb-3 text-[10px] font-black uppercase tracking-widest">
             <ArrowDownRight size={14} /> Cash In
           </div>
-          <div className="text-xl font-bold text-white">{formatMoney(monthlyIncome, isAED, fxRate, 'AED')}</div>
+          <div className="text-xl font-bold text-white transition-all">{formatMoney(periodIncome, isAED, fxRate, 'AED')}</div>
         </div>
         
         <div className="bg-neutral-900/40 border border-neutral-800 rounded-3xl p-5 relative overflow-hidden">
           <div className="flex items-center gap-2 text-rose-500 mb-3 text-[10px] font-black uppercase tracking-widest">
             <ArrowUpRight size={14} /> Cash Out
           </div>
-          <div className="text-xl font-bold text-white">{formatMoney(monthlyExpense, isAED, fxRate, 'AED')}</div>
-          {creditSpending > 0 && (
-            <p className="text-[8px] text-amber-500 font-black uppercase mt-2 tracking-tighter">
-              + {formatMoney(creditSpending, isAED, fxRate, 'AED')} on Credit
+          <div className="text-xl font-bold text-white transition-all">{formatMoney(periodExpense, isAED, fxRate, 'AED')}</div>
+          {periodCreditSpending > 0 && (
+            <p className="text-[8px] text-amber-500 font-black uppercase mt-2 tracking-tighter transition-all">
+              + {formatMoney(periodCreditSpending, isAED, fxRate, 'AED')} on Credit
             </p>
           )}
         </div>
       </div>
 
-      {/* --- RESTORED: UPCOMING BILLS WIDGET --- */}
+      {/* UPCOMING BILLS WIDGET */}
       {upcomingBills && upcomingBills.length > 0 && (
         <div className="space-y-4 pt-2">
           <div className="flex justify-between items-center px-1">
@@ -285,7 +320,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* QUICK ACTIONS GRID */}
       {/* QUICK ACTIONS GRID */}
       <div className="grid grid-cols-4 gap-y-6 gap-x-4 pb-2">
         {[

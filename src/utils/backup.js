@@ -19,11 +19,28 @@ if (Capacitor.isNativePlatform()) {
 
 export const exportData = async () => {
   const data = {};
-  const keys = ['coinsave_transactions', 'coinsave_wealth', 'coinsave_remittances', 'coinsave_upcoming', 'coinsave_loans', 'coinsave_pin'];
+  
+  // 🔴 ADDED 'coinsave_cards' to the backup keys array
+  const keys = [
+    'coinsave_transactions', 
+    'coinsave_wealth', 
+    'coinsave_remittances', 
+    'coinsave_upcoming', 
+    'coinsave_loans', 
+    'coinsave_pin',
+    'coinsave_cards' 
+  ];
 
   keys.forEach(key => {
     const value = localStorage.getItem(key);
-    if (value) data[key] = JSON.parse(value);
+    // Only parse if the value is valid JSON, otherwise save the raw string (like the PIN)
+    if (value) {
+      try {
+        data[key] = JSON.parse(value);
+      } catch (e) {
+        data[key] = value; 
+      }
+    }
   });
 
   const jsonString = JSON.stringify(data, null, 2);
@@ -67,9 +84,14 @@ export const importData = (file, callback) => {
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result);
-      Object.keys(data).forEach(key => localStorage.setItem(key, JSON.stringify(data[key])));
+      // Automatically iterates through all keys in the backup, including cards
+      Object.keys(data).forEach(key => {
+        const val = typeof data[key] === 'object' ? JSON.stringify(data[key]) : data[key];
+        localStorage.setItem(key, val);
+      });
       callback(true);
     } catch (err) {
+      console.error("Import failed", err);
       callback(false);
     }
   };
